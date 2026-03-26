@@ -10,15 +10,9 @@ actions!(
         ActivateTab1,
         ActivateTab2,
         ActivateTab3,
-        ActivateTab4,
-        ActivateTab5,
-        ActivateTab6,
-        ActivateTab7,
-        ActivateTab8,
-        ActivateTab9,
         ToggleFullscreen,
         MinimizeWindow,
-        DuplicateTab,
+        MaximizeWindow,
         QuitApp,
         OpenSettings,
     ]
@@ -83,45 +77,47 @@ fn activate_tab_by_number(number: usize, cx: &mut App) {
 }
 
 fn toggle_fullscreen(cx: &mut App) {
+    tracing::info!("toggle_fullscreen called");
     let Some(active_window) = cx.active_window() else {
+        tracing::warn!("No active window for toggle_fullscreen");
         return;
     };
     cx.defer(move |cx| {
+        tracing::info!("toggle_fullscreen deferred execution");
         _ = active_window.update(cx, |_, window, _| {
             window.toggle_fullscreen();
         });
     });
 }
 
-fn minimize_window(cx: &mut App) {
+fn maximize_window(cx: &mut App) {
+    tracing::info!("maximize_window called");
     let Some(active_window) = cx.active_window() else {
+        tracing::warn!("No active window for maximize_window");
         return;
     };
     cx.defer(move |cx| {
+        tracing::info!("maximize_window deferred execution");
+        _ = active_window.update(cx, |_, window, _| {
+            window.zoom_window();
+        });
+    });
+}
+
+fn minimize_window(cx: &mut App) {
+    tracing::info!("minimize_window called");
+    let Some(active_window) = cx.active_window() else {
+        tracing::warn!("No active window for minimize_window");
+        return;
+    };
+    cx.defer(move |cx| {
+        tracing::info!("minimize_window deferred execution");
         _ = active_window.update(cx, |_, window, _| {
             if window.is_window_active() {
                 window.minimize_window();
             } else {
                 window.activate_window();
             }
-        });
-    });
-}
-
-fn duplicate_tab(cx: &mut App) {
-    let Some(active_window) = cx.active_window() else {
-        return;
-    };
-    let Some(home) = cx.try_global::<GlobalHomePage>() else {
-        return;
-    };
-    let home_page = home.home_page.clone();
-
-    cx.defer(move |cx| {
-        _ = active_window.update(cx, |_, window, cx| {
-            home_page.update(cx, |hp, cx| {
-                hp.duplicate_active_tab(window, cx);
-            });
         });
     });
 }
@@ -161,36 +157,12 @@ pub fn init(cx: &mut App) {
         KeyBinding::new("cmd-2", ActivateTab2, None),
         #[cfg(target_os = "macos")]
         KeyBinding::new("cmd-3", ActivateTab3, None),
-        #[cfg(target_os = "macos")]
-        KeyBinding::new("cmd-4", ActivateTab4, None),
-        #[cfg(target_os = "macos")]
-        KeyBinding::new("cmd-5", ActivateTab5, None),
-        #[cfg(target_os = "macos")]
-        KeyBinding::new("cmd-6", ActivateTab6, None),
-        #[cfg(target_os = "macos")]
-        KeyBinding::new("cmd-7", ActivateTab7, None),
-        #[cfg(target_os = "macos")]
-        KeyBinding::new("cmd-8", ActivateTab8, None),
-        #[cfg(target_os = "macos")]
-        KeyBinding::new("cmd-9", ActivateTab9, None),
         #[cfg(not(target_os = "macos"))]
         KeyBinding::new("alt-1", ActivateTab1, None),
         #[cfg(not(target_os = "macos"))]
         KeyBinding::new("alt-2", ActivateTab2, None),
         #[cfg(not(target_os = "macos"))]
         KeyBinding::new("alt-3", ActivateTab3, None),
-        #[cfg(not(target_os = "macos"))]
-        KeyBinding::new("alt-4", ActivateTab4, None),
-        #[cfg(not(target_os = "macos"))]
-        KeyBinding::new("alt-5", ActivateTab5, None),
-        #[cfg(not(target_os = "macos"))]
-        KeyBinding::new("alt-6", ActivateTab6, None),
-        #[cfg(not(target_os = "macos"))]
-        KeyBinding::new("alt-7", ActivateTab7, None),
-        #[cfg(not(target_os = "macos"))]
-        KeyBinding::new("alt-8", ActivateTab8, None),
-        #[cfg(not(target_os = "macos"))]
-        KeyBinding::new("alt-9", ActivateTab9, None),
         #[cfg(target_os = "macos")]
         KeyBinding::new("ctrl-cmd-f", ToggleFullscreen, None),
         #[cfg(not(target_os = "macos"))]
@@ -200,9 +172,9 @@ pub fn init(cx: &mut App) {
         #[cfg(not(target_os = "macos"))]
         KeyBinding::new("ctrl-space", MinimizeWindow, None),
         #[cfg(target_os = "macos")]
-        KeyBinding::new("cmd-shift-t", DuplicateTab, None),
+        KeyBinding::new("ctrl-cmd-m", MaximizeWindow, None),
         #[cfg(not(target_os = "macos"))]
-        KeyBinding::new("alt-shift-t", DuplicateTab, None),
+        KeyBinding::new("alt-m", MaximizeWindow, None),
         #[cfg(target_os = "macos")]
         KeyBinding::new("cmd-q", QuitApp, None),
         #[cfg(not(target_os = "macos"))]
@@ -216,15 +188,9 @@ pub fn init(cx: &mut App) {
     cx.on_action(|_: &ActivateTab1, cx| activate_tab_by_number(1, cx));
     cx.on_action(|_: &ActivateTab2, cx| activate_tab_by_number(2, cx));
     cx.on_action(|_: &ActivateTab3, cx| activate_tab_by_number(3, cx));
-    cx.on_action(|_: &ActivateTab4, cx| activate_tab_by_number(4, cx));
-    cx.on_action(|_: &ActivateTab5, cx| activate_tab_by_number(5, cx));
-    cx.on_action(|_: &ActivateTab6, cx| activate_tab_by_number(6, cx));
-    cx.on_action(|_: &ActivateTab7, cx| activate_tab_by_number(7, cx));
-    cx.on_action(|_: &ActivateTab8, cx| activate_tab_by_number(8, cx));
-    cx.on_action(|_: &ActivateTab9, cx| activate_tab_by_number(9, cx));
     cx.on_action(|_: &ToggleFullscreen, cx| toggle_fullscreen(cx));
     cx.on_action(|_: &MinimizeWindow, cx| minimize_window(cx));
-    cx.on_action(|_: &DuplicateTab, cx| duplicate_tab(cx));
+    cx.on_action(|_: &MaximizeWindow, cx| maximize_window(cx));
     cx.on_action(|_: &QuitApp, cx| quit_app(cx));
     cx.on_action(|_: &OpenSettings, cx| crate::settings::settings_window::open_settings_window(cx));
     cx.on_action(|_: &OpenConnectionQuickOpen, cx| {

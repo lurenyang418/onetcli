@@ -1194,6 +1194,12 @@ impl TabContent for HomePage {
     fn width_size(&self, _cx: &App) -> Option<Size> {
         Some(Size::Small)
     }
+
+    fn on_activate(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        // 每次激活首页 tab 时，清除选中状态，显示欢迎页
+        self.selected_connection_id = None;
+        cx.notify();
+    }
 }
 
 impl Render for HomePage {

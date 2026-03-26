@@ -801,11 +801,13 @@ impl TabContainer {
 
     /// Activate the pinned tab (deactivate regular tabs visually).
     pub fn activate_pinned_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.pinned_tab.is_some() {
-            self.pinned_tab_active = true;
-            if let Some(pinned) = &self.pinned_tab {
-                pinned.content().focus_handle(cx).focus(window, cx);
+        if let Some(pinned) = &self.pinned_tab {
+            if self.pinned_tab_active {
+                pinned.content().on_deactivate(window, cx);
             }
+            self.pinned_tab_active = true;
+            pinned.content().on_activate(window, cx);
+            pinned.content().focus_handle(cx).focus(window, cx);
             cx.notify();
         }
     }
