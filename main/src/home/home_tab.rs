@@ -1160,10 +1160,6 @@ impl HomePage {
         });
     }
 
-    /// 复制当前活动标签并打开
-    pub(crate) fn duplicate_active_tab(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {
-        // Terminal 复制功能已移除
-    }
 }
 
 impl Focusable for HomePage {

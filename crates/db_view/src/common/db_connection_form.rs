@@ -99,7 +99,7 @@ impl TeamSelectItem {
     pub fn personal() -> Self {
         Self {
             id: None,
-            name: t!("TeamSync.personal").to_string(),
+            name: "Personal".into(),
         }
     }
 

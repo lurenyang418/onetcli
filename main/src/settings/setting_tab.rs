@@ -273,11 +273,6 @@ const TAB_SHORTCUTS: &[ShortcutEntry] = &[
         label_key: "Settings.Shortcuts.switch_tab_n",
     },
     ShortcutEntry {
-        key_macos: "shift-cmd-t",
-        key_other: "alt-shift-t",
-        label_key: "Settings.Shortcuts.duplicate_tab",
-    },
-    ShortcutEntry {
         key_macos: "cmd-o",
         key_other: "alt-o",
         label_key: "Settings.Shortcuts.quick_open",
@@ -352,7 +347,7 @@ pub(crate) fn render_shortcuts_section(cx: &App) -> gpui::AnyElement {
 }
 
 /// GitHub 开源地址
-const GITHUB_URL: &str = "https://github.com/feigeCode/onetcli";
+const GITHUB_URL: &str = "https://github.com/lurenyang418/pig";
 
 /// 渲染关于页面
 pub(crate) fn render_about_section(cx: &App) -> gpui::AnyElement {
@@ -367,7 +362,7 @@ pub(crate) fn render_about_section(cx: &App) -> gpui::AnyElement {
         })
         .collect();
 
-    let data_safety_items: Vec<String> = (1..=3)
+    let data_safety_items: Vec<String> = (1..=2)
         .map(|i| {
             let key = format!("Settings.About.data_safety_item_{}", i);
             let text = t!(&key).to_string();
