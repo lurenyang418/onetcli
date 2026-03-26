@@ -169,6 +169,35 @@ Connection:
 # 连接表单
 ConnectionForm:
   # 标签组
+  labels:
+    name:
+      en: Name
+      zh-CN: 名称
+      zh-HK: 名稱
+    host:
+      en: Host
+      zh-CN: 主机
+      zh-HK: 主機
+    port:
+      en: Port
+      zh-CN: 端口
+      zh-HK: 連接埠
+    database:
+      en: Database
+      zh-CN: 数据库
+      zh-HK: 數據庫
+    username:
+      en: Username
+      zh-CN: 用户名
+      zh-HK: 用戶名
+    password:
+      en: Password
+      zh-CN: 密码
+      zh-HK: 密碼
+    dsn:
+      en: DSN
+      zh-CN: 连接字符串
+      zh-HK: 連線字串
   general:
     en: General
     zh-CN: 常规
@@ -197,6 +226,14 @@ ConnectionForm:
     en: Require (Force TLS)
     zh-CN: 必须（强制使用 TLS）
     zh-HK: 必須（強制使用 TLS）
+  sslmode_verify_ca:
+    en: Verify CA (Verify server certificate)
+    zh-CN: 验证 CA（验证服务器证书）
+    zh-HK: 驗證 CA（驗證伺服器憑證）
+  sslmode_verify_full:
+    en: Verify Full (Verify server certificate and hostname)
+    zh-CN: 完全验证（验证服务器证书和主机名）
+    zh-HK: 完全驗證（驗證伺服器憑證和主機名）
   ssh:
     en: SSH
     zh-CN: SSH

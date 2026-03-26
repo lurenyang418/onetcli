@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-use crate::chatdb::db_connection_selector::{DbSelectorContext, SelectorSourceMode};
 use crate::database_objects_tab::DatabaseObjectsPanel;
 use crate::db_tree_event::DatabaseEventHandler;
 use crate::db_tree_view::DbTreeView;
@@ -47,13 +46,10 @@ pub fn init(cx: &mut App) {
 
 const PANEL_MIN_SIZE: Pixels = px(100.0);
 const TREE_PANEL_DEFAULT_SIZE: Pixels = px(250.0);
-const CHAT_SIDEBAR_MIN_WIDTH: Pixels = px(360.0);
-const CHAT_SIDEBAR_DEFAULT_WIDTH: Pixels = px(420.0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResizingPanel {
     TreePanel,
-    Sidebar,
 }
 
 pub struct DatabaseTabView {
@@ -167,16 +163,7 @@ impl DatabaseTabView {
             )
         });
 
-        let selector_context = DbSelectorContext {
-            source_mode: if workspace.is_some() {
-                SelectorSourceMode::Workspace
-            } else {
-                SelectorSourceMode::SingleConnection
-            },
-            connections: connections.clone(),
-            active_connection_id: active_conn_id,
-        };
-        let sidebar = cx.new(|cx| DatabaseSidebar::new(window, cx, selector_context.clone()));
+        let sidebar = cx.new(|cx| DatabaseSidebar::new(window, cx, ()));
 
         // 注册 SQL 代码块操作
         Self::register_sql_code_block_actions(&sidebar, tab_container.clone(), &connections, cx);
@@ -226,7 +213,7 @@ impl DatabaseTabView {
             sidebar,
             _subscriptions: subscriptions,
             tree_panel_size: TREE_PANEL_DEFAULT_SIZE,
-            sidebar_panel_size: SIDEBAR_DEFAULT_WIDTH.max(CHAT_SIDEBAR_DEFAULT_WIDTH),
+            sidebar_panel_size: SIDEBAR_DEFAULT_WIDTH,
             resizing: None,
             bounds: Bounds::default(),
         }
@@ -360,25 +347,6 @@ impl DatabaseTabView {
             })
     }
 
-    fn render_sidebar_resize_handle(
-        &mut self,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let view = cx.entity().clone();
-
-        resize_handle::<ResizePanel, ResizePanel>("sidebar-resize-handle", Axis::Horizontal)
-            .placement(HandlePlacement::Right)
-            .on_drag(ResizePanel, move |info, _, _, cx| {
-                cx.stop_propagation();
-                view.update(cx, |view, cx| {
-                    view.resizing = Some(ResizingPanel::Sidebar);
-                    cx.notify();
-                });
-                cx.new(|_| info.deref().clone())
-            })
-    }
-
     fn resize(
         &mut self,
         mouse_position: Point<Pixels>,
@@ -403,14 +371,6 @@ impl DatabaseTabView {
                 let max_size =
                     (available_width - PANEL_MIN_SIZE - sidebar_width).max(PANEL_MIN_SIZE);
                 self.tree_panel_size = new_size.clamp(PANEL_MIN_SIZE, max_size);
-            }
-            ResizingPanel::Sidebar => {
-                let new_size = self.bounds.right() - mouse_position.x;
-                let max_size = (available_width - self.tree_panel_size - PANEL_MIN_SIZE)
-                    .max(SIDEBAR_MIN_WIDTH);
-                let upper = max_size.min(SIDEBAR_MAX_WIDTH);
-                let lower = SIDEBAR_MIN_WIDTH.max(CHAT_SIDEBAR_MIN_WIDTH).min(upper);
-                self.sidebar_panel_size = new_size.clamp(lower, upper);
             }
         }
 
@@ -677,7 +637,6 @@ impl Render for DatabaseTabView {
                                     .h_full()
                                     .w(sidebar_panel_size)
                                     .flex_shrink_0()
-                                    .child(self.render_sidebar_resize_handle(window, cx))
                                     .child(self.sidebar.clone()),
                             )
                         })

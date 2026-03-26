@@ -25,12 +25,6 @@ dirs = {workspace = true}
 futures = { workspace = true }
 smol = { workspace = true }
 db_view = { workspace = true }
-terminal = { workspace = true }
-terminal_view = { workspace = true }
-sftp_view = { workspace = true }
-redis_view = { workspace = true }
-mongodb_view = { workspace = true }
-api_view = { workspace = true }
 one-core.workspace = true
 one-ui.workspace = true
 reqwest_client.workspace = true

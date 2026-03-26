@@ -13,15 +13,12 @@ use crate::connection::{DbConnection, DbError, StreamingProgress};
 use crate::executor::{
     ExecOptions, ExecResult, QueryColumnMeta, QueryResult, SqlErrorInfo, SqlResult, SqlSource,
 };
-use crate::ssh_tunnel::resolve_connection_target;
 use crate::{format_message, truncate_str, DatabasePlugin};
-use ssh::LocalPortForwardTunnel;
 use tokio::sync::mpsc;
 
 pub struct PostgresDbConnection {
     config: DbConnectionConfig,
     client: Arc<Mutex<Option<Client>>>,
-    tunnel: Option<LocalPortForwardTunnel>,
 }
 
 impl PostgresDbConnection {
@@ -29,7 +26,6 @@ impl PostgresDbConnection {
         Self {
             config,
             client: Arc::new(Mutex::new(None)),
-            tunnel: None,
         }
     }
 
@@ -228,13 +224,11 @@ impl DbConnection for PostgresDbConnection {
     async fn connect(&mut self) -> Result<(), DbError> {
         let config = &self.config;
         info!("[PostgreSQL] Connecting to {}:{}", config.host, config.port);
-        let target = resolve_connection_target(config).await?;
-        self.tunnel = target.tunnel;
 
         let mut pg_config = Config::new();
         pg_config
-            .host(&target.host)
-            .port(target.port)
+            .host(&config.host)
+            .port(config.port)
             .user(&config.username)
             .password(&config.password);
 
@@ -316,7 +310,6 @@ impl DbConnection for PostgresDbConnection {
         debug!("[PostgreSQL] Disconnecting...");
         let mut guard = self.client.lock().await;
         *guard = None;
-        self.tunnel = None;
         info!("[PostgreSQL] Disconnected");
         Ok(())
     }

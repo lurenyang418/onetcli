@@ -9,9 +9,7 @@ use crate::common::db_connection_form::DbConnectionForm;
 use crate::common::{DatabaseEditorView, SchemaEditorView};
 use crate::database_objects_tab::DatabaseObjectsEvent;
 use crate::db_tree_view::DbTreeViewEvent;
-use crate::mysql::mysql_view_plugin::MySqlDatabaseViewPlugin;
 use crate::postgresql::postgresql_view_plugin::PostgreSqlDatabaseViewPlugin;
-use crate::sqlite::sqlite_view_plugin::SqliteDatabaseViewPlugin;
 
 /// 工具栏按钮类型
 #[derive(Debug, Clone)]
@@ -268,9 +266,7 @@ impl DatabaseViewPluginRegistry {
             plugins: HashMap::new(),
         };
 
-        registry.register(MySqlDatabaseViewPlugin::new());
         registry.register(PostgreSqlDatabaseViewPlugin::new());
-        registry.register(SqliteDatabaseViewPlugin::new());
 
         registry
     }

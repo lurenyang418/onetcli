@@ -431,8 +431,7 @@ impl DbFormConfig {
                     )
                     .optional()
                     .placeholder("database name (optional)"),
-                ]),
-                TabGroup::new("advanced", t!("ConnectionForm.advanced")).fields(vec![
+                    // Advanced: connect_timeout
                     FormField::new(
                         "connect_timeout",
                         t!("ConnectionForm.connect_timeout"),
@@ -441,6 +440,7 @@ impl DbFormConfig {
                     .optional()
                     .placeholder("30")
                     .default("30"),
+                    // Advanced: application_name
                     FormField::new(
                         "application_name",
                         t!("ConnectionForm.application_name"),
@@ -448,20 +448,32 @@ impl DbFormConfig {
                     )
                     .optional()
                     .placeholder("Application Name"),
-                ]),
-                TabGroup::new("ssl", t!("ConnectionForm.ssl")),
-                Self::ssh_tab_group(),
-                TabGroup::new("notes", t!("ConnectionForm.notes")).fields(vec![
+                    // SSL mode
+                    FormField::new(
+                        "sslmode",
+                        t!("ConnectionForm.sslmode"),
+                        FormFieldType::Select,
+                    )
+                    .optional()
+                    .default("disable")
+                    .options(vec![
+                        ("disable".to_string(), t!("ConnectionForm.sslmode_disable").to_string()),
+                        ("require".to_string(), t!("ConnectionForm.sslmode_require").to_string()),
+                        ("verify-ca".to_string(), t!("ConnectionForm.sslmode_verify_ca").to_string()),
+                        ("verify-full".to_string(), t!("ConnectionForm.sslmode_verify_full").to_string()),
+                    ]),
+                    // Remark/notes
                     FormField::new(
                         "remark",
                         t!("ConnectionForm.remark"),
                         FormFieldType::TextArea,
                     )
-                    .rows(14)
+                    .rows(3)
                     .optional()
                     .placeholder(t!("ConnectionForm.enter_remark"))
                     .default(""),
                 ]),
+                Self::ssh_tab_group(),
             ],
         }
     }
@@ -1239,7 +1251,8 @@ impl Render for DbConnectionForm {
                                 .layout(Axis::Horizontal)
                                 .with_size(Size::Medium)
                                 .columns(1)
-                                .label_width(px(100.))
+                                .w(px(560.))
+                                .label_width(px(224.))
                                 .children(current_tab_fields.iter().enumerate().map(
                                     |(i, field_info)| {
                                         let input_idx = field_input_offset + i;
@@ -1308,22 +1321,6 @@ impl Render for DbConnectionForm {
                                             )
                                     },
                                 ))
-                                .when(is_general_tab, |form| {
-                                    form.child(
-                                        field()
-                                            .label(t!("ConnectionForm.workspace").to_string())
-                                            .items_center()
-                                            .label_justify_end()
-                                            .child(Select::new(&self.workspace_select).w_full()),
-                                    )
-                                    .child(
-                                        field()
-                                            .label(t!("TeamSync.team_label").to_string())
-                                            .items_center()
-                                            .label_justify_end()
-                                            .child(Select::new(&self.team_select).w_full()),
-                                    )
-                                    })
                         )
                     })
                     .when(current_tab_fields.is_empty(), |this| {

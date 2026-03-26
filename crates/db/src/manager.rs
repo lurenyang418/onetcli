@@ -4,10 +4,8 @@ use crate::connection::{DbConnection, DbError, StreamingProgress};
 use crate::import_export::{
     ExportConfig, ExportProgressSender, ExportResult, ImportConfig, ImportResult,
 };
-use crate::mysql::MySqlPlugin;
 use crate::plugin::DatabasePlugin;
 use crate::postgresql::PostgresPlugin;
-use crate::sqlite::SqlitePlugin;
 use crate::{
     DbNode, DbNodeType, ExecOptions, SqlErrorInfo, SqlResult, SqlSource, TableSaveResponse,
 };
@@ -122,25 +120,23 @@ macro_rules! with_plugin_session_db {
 
 /// Database manager - creates database plugins
 pub struct DbManager {
-    mysql: Arc<dyn DatabasePlugin>,
     postgresql: Arc<dyn DatabasePlugin>,
-    sqlite: Arc<dyn DatabasePlugin>,
 }
 
 impl DbManager {
     pub fn new() -> Self {
         Self {
-            mysql: Arc::new(MySqlPlugin::new()),
             postgresql: Arc::new(PostgresPlugin::new()),
-            sqlite: Arc::new(SqlitePlugin::new()),
         }
     }
 
     pub fn get_plugin(&self, db_type: &DatabaseType) -> Result<Arc<dyn DatabasePlugin>, DbError> {
         match db_type {
-            DatabaseType::MySQL => Ok(Arc::clone(&self.mysql)),
             DatabaseType::PostgreSQL => Ok(Arc::clone(&self.postgresql)),
-            DatabaseType::SQLite => Ok(Arc::clone(&self.sqlite)),
+            _ => Err(DbError::Internal(format!(
+                "Unsupported database type: {:?}",
+                db_type
+            ))),
         }
     }
 }
@@ -154,9 +150,7 @@ impl Default for DbManager {
 impl Clone for DbManager {
     fn clone(&self) -> Self {
         Self {
-            mysql: Arc::clone(&self.mysql),
             postgresql: Arc::clone(&self.postgresql),
-            sqlite: Arc::clone(&self.sqlite),
         }
     }
 }

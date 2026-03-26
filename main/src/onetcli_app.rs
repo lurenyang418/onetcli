@@ -145,16 +145,12 @@ pub fn init(cx: &mut App) {
     gpui_component::init(cx);
     one_core::init(cx);
     one_ui::init(cx);
-    db_view::chatdb::agents::init(cx);
     db::init_cache(cx);
     // 启动后台磁盘缓存清理任务
     if let Some(cache) = cx.try_global::<db::GlobalNodeCache>() {
         cache.start_cleanup_task(cx);
     }
-    terminal_view::init(cx);
     db_view::init(cx);
-    redis_view::init(cx);
-    mongodb_view::init(cx);
     crate::home_tab::init(cx);
     cx.bind_keys(vec![
         KeyBinding::new("shift-escape", ToggleZoom, None),

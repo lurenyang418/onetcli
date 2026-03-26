@@ -57,6 +57,10 @@ Home:
     en: New Connection
     zh-CN: 新建连接
     zh-HK: 新建連線
+  new_connection_shortcut:
+    en: "Press Cmd+N (Mac) or Ctrl+N to create a new connection"
+    zh-CN: "按 Cmd+N (Mac) 或 Ctrl+N 新建连接"
+    zh-HK: "按 Cmd+N (Mac) 或 Ctrl+N 新建連線"
   connection_count:
     en: "%{count} connections"
     zh-CN: "%{count} 个连接"
@@ -65,6 +69,22 @@ Home:
     en: Unassigned Workspace
     zh-CN: 未分配工作区
     zh-HK: 未分配工作區
+  no_connections:
+    en: No connections yet
+    zh-CN: 暂无连接
+    zh-HK: 暫無連線
+  no_connections_hint:
+    en: Click the button above to create a new connection
+    zh-CN: 点击上方按钮新建连接
+    zh-HK: 點擊上方按鈕新建連線
+  welcome:
+    en: Welcome to OnetCli
+    zh-CN: 欢迎使用 OnetCli
+    zh-HK: 歡迎使用 OnetCli
+  welcome_hint:
+    en: Select a connection from the sidebar to view details
+    zh-CN: 从侧边栏选择一个连接查看详情
+    zh-HK: 從側邊欄選擇一個連線查看詳情
   switch_theme:
     en: Switch Theme
     zh-CN: 切换主题
@@ -547,6 +567,38 @@ Connection:
     en: "Connection \"%{conn_name}\" is in use and must be closed before deletion.\n\nPlease close the connection first before deleting."
     zh-CN: "连接 \"%{conn_name}\" 正在使用中，删除前需要先关闭该连接。\n\n请先关闭该连接后再进行删除。"
     zh-HK: "連線 \"%{conn_name}\" 正在使用中，刪除前需要先關閉該連線。\n\n請先關閉該連線後再進行刪除。"
+
+# 连接表单
+ConnectionForm:
+  labels:
+    name:
+      en: Name
+      zh-CN: 名称
+      zh-HK: 名稱
+    host:
+      en: Host
+      zh-CN: 主机
+      zh-HK: 主機
+    port:
+      en: Port
+      zh-CN: 端口
+      zh-HK: 連接埠
+    database:
+      en: Database
+      zh-CN: 数据库
+      zh-HK: 數據庫
+    username:
+      en: Username
+      zh-CN: 用户名
+      zh-HK: 用戶名
+    password:
+      en: Password
+      zh-CN: 密码
+      zh-HK: 密碼
+    dsn:
+      en: DSN
+      zh-CN: 连接字符串
+      zh-HK: 連線字串
 
 # 设置页面
 Settings:

@@ -12,20 +12,17 @@ anyhow.workspace = true
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-rusqlite.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 hex.workspace = true
 gpui.workspace = true
 gpui-component.workspace = true
 chrono.workspace = true
-mysql_async.workspace = true
 tokio-postgres.workspace = true
 postgres-native-tls = { workspace = true, optional = true }
 native-tls = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["compat"] }
 one-core.workspace = true
-ssh.workspace = true
 sqlformat.workspace = true
 sqlparser.workspace = true
 uuid.workspace = true
