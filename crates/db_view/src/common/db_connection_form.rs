@@ -1243,7 +1243,7 @@ impl Render for DbConnectionForm {
                     .min_h(px(250.))
                     .overflow_y_scrollbar()
                     .when(!current_tab_fields.is_empty(), |this| {
-                        let is_general_tab = self.active_tab == 0;
+                        let _is_general_tab = self.active_tab == 0;
                         let db_type = self.config.db_type;
 
                         this.child(

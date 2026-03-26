@@ -1,6 +1,5 @@
 use gpui::{
-    AnyView, App, AppContext, Bounds, DispatchPhase,
-    KeyDownEvent, KeyEvent, Keystroke,
+    AnyView, App, AppContext, Bounds,
     SharedString, Size, Window, WindowBounds, WindowKind, WindowOptions, px, size,
 };
 use gpui_component::{Root, TitleBar};

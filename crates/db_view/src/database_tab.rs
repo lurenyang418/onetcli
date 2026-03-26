@@ -15,7 +15,7 @@ use gpui::{
 use gpui_component::{ActiveTheme, Icon, IconName, Sizable, Size, h_flex, v_flex};
 use one_core::ai_chat::{CodeBlockAction, LanguageMatcher};
 use one_core::layout::{
-    SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, TOOLBAR_WIDTH,
+    SIDEBAR_DEFAULT_WIDTH, TOOLBAR_WIDTH,
 };
 use one_core::storage::{ActiveConnections, DatabaseType, Workspace};
 use one_core::{

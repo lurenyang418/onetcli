@@ -3,11 +3,8 @@
 rust_i18n::i18n!("locales", fallback = "en");
 
 mod home;
-mod home_tab;
 mod onetcli_app;
-mod setting_tab;
 mod settings;
-mod settings_window;
 mod update;
 
 use crate::onetcli_app::OnetCliApp;
@@ -26,7 +23,7 @@ fn main() {
 
     app.run(move |cx| {
         onetcli_app::init(cx);
-        setting_tab::init_settings(cx);
+        settings::setting_tab::init_settings(cx);
         // Initialize global database state
         let db_state = GlobalDbState::new();
         // Start cleanup task
@@ -68,7 +65,7 @@ fn main() {
                 window.activate_window();
 
                 // 根据设置决定是否最大化窗口
-                if let Some(settings) = cx.try_global::<setting_tab::AppSettings>() {
+                if let Some(settings) = cx.try_global::<settings::setting_tab::AppSettings>() {
                     if settings.start_maximized {
                         window.zoom_window();
                     }

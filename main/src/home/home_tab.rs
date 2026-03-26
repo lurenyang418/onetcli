@@ -1,24 +1,18 @@
-use std::collections::HashSet;
-
 use db_view::connection_form_window::{ConnectionFormWindow, ConnectionFormWindowConfig};
+use db_view::database_tab::DatabaseTabView;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, App, AppContext, AsyncApp, Context, ElementId, Entity, EventEmitter, FocusHandle,
+    AnyElement, App, AppContext, AsyncApp, Context, Entity, EventEmitter, FocusHandle,
     Focusable, FontWeight, InteractiveElement, IntoElement, KeyBinding, ParentElement, Render,
     SharedString, StatefulInteractiveElement, Styled, Subscription, Window, actions,
     div, px,
 };
-use gpui_component::button::{ButtonCustomVariant, ButtonVariant};
-use gpui_component::menu::DropdownMenu;
 use gpui_component::{
     ActiveTheme, Icon, IconName, InteractiveElementExt, Sizable, Size, WindowExt,
     button::{Button, ButtonVariants as _},
-    checkbox::Checkbox,
     h_flex,
-    input::{Input, InputEvent, InputState},
+    input::{Input, InputState},
     list::{List, ListState},
-    menu::PopupMenuItem,
-    popover::Popover,
     tooltip::Tooltip,
     v_flex,
 };
@@ -27,25 +21,14 @@ use one_core::popup_window::{PopupWindowOptions, open_popup_window};
 use one_core::storage::traits::Repository;
 use one_core::storage::{
     ActiveConnections, ConnectionRepository, ConnectionType, DatabaseType, GlobalStorageState,
-    StoredConnection, Workspace, WorkspaceRepository,
+    StoredConnection,
 };
-use one_core::tab_container::{TabContainer, TabContent, TabContentEvent};
+use one_core::tab_container::{TabContainer, TabContent, TabContentEvent, TabItem};
 use rust_i18n::t;
 
 use crate::home::home_connection_quick_open::ConnectionQuickOpenDelegate;
-use crate::home::home_strategy::build_connection_open_strategy;
-use crate::home::home_workspace_filter::WorkspaceFilterDelegate;
 
 actions!(home_tab, [OpenConnectionQuickOpen, NewConnectionShortcut]);
-
-fn get_cached_team_options(_cx: &App) -> Vec<one_core::TeamOption> {
-    Vec::new()
-}
-
-/// 检查用户是否可以编辑连接（简化版本，云同步移除后始终返回 true）
-fn can_edit_connection(_conn: &StoredConnection, _cx: &App) -> bool {
-    true
-}
 
 pub fn init(cx: &mut App) {
     cx.bind_keys([
@@ -64,17 +47,11 @@ pub fn init(cx: &mut App) {
 
 pub struct HomePage {
     focus_handle: FocusHandle,
-    pub(crate) workspaces: Vec<Workspace>,
     pub(crate) connections: Vec<StoredConnection>,
     pub(crate) tab_container: Entity<TabContainer>,
     search_input: Entity<InputState>,
-    search_query: Entity<String>,
     pub(crate) editing_connection_id: Option<i64>,
     selected_connection_id: Option<i64>,
-    editing_workspace_id: Option<i64>,
-    pub(crate) filtered_workspace_ids: HashSet<i64>,
-    pub(crate) workspace_filter_open: bool,
-    workspace_filter_list: Option<Entity<ListState<WorkspaceFilterDelegate>>>,
     pub(crate) _subscriptions: Vec<Subscription>,
     /// 复制的字段名（用于显示反馈）
     pub(crate) copied_field: Option<String>,
@@ -88,50 +65,23 @@ impl HomePage {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let search_query = cx.new(|_| String::new());
         let search_input = cx.new(|cx| {
             InputState::new(window, cx)
                 .placeholder(t!("Home.search_placeholder"))
                 .clean_on_escape()
         });
 
-        // 订阅搜索输入变化
-        let query_clone = search_query.clone();
-        cx.subscribe_in(
-            &search_input,
-            window,
-            move |_this, _input, event, _window, cx| {
-                if let InputEvent::Change = event {
-                    query_clone.update(cx, |q, cx| {
-                        *q = _input.read(cx).text().to_string();
-                        cx.notify();
-                    });
-                    cx.notify();
-                }
-            },
-        )
-        .detach();
-
         let mut page = Self {
             focus_handle: cx.focus_handle(),
-            workspaces: Vec::new(),
             connections: Vec::new(),
             tab_container,
             search_input,
-            search_query,
             editing_connection_id: None,
             selected_connection_id: None,
-            editing_workspace_id: None,
-            filtered_workspace_ids: HashSet::new(),
-            workspace_filter_open: false,
-            workspace_filter_list: None,
             _subscriptions: Vec::new(),
             copied_field: None,
             password_visible: false,
         };
-
-        // 异步加载工作区
-        page.load_workspaces(cx);
 
         // 加载连接
         page.load_connections(cx);
@@ -175,7 +125,7 @@ impl HomePage {
                     ConnectionDataEvent::WorkspaceCreated { .. }
                     | ConnectionDataEvent::WorkspaceUpdated { .. }
                     | ConnectionDataEvent::WorkspaceDeleted { .. } => {
-                        this.load_workspaces(cx);
+                        // Workspace 事件已禁用，忽略
                     }
                     ConnectionDataEvent::SchemaChanged { .. } => {
                         // SchemaChanged 由 db_tree_view 处理，此处无需操作
@@ -186,31 +136,6 @@ impl HomePage {
         }
 
         page
-    }
-
-    fn load_workspaces(&mut self, cx: &mut Context<Self>) {
-        let storage = cx.global::<GlobalStorageState>().storage.clone();
-        cx.spawn(async move |this, cx: &mut AsyncApp| {
-            let result = (|| {
-                let repo = storage
-                    .get::<WorkspaceRepository>()
-                    .ok_or_else(|| anyhow::anyhow!("WorkspaceRepository not found"))?;
-                repo.list()
-            })();
-
-            match result {
-                Ok(workspaces) => {
-                    _ = this.update(cx, |this, cx| {
-                        this.workspaces = workspaces;
-                        cx.notify();
-                    });
-                }
-                Err(e) => {
-                    tracing::error!("Task join error: {}", e);
-                }
-            }
-        })
-        .detach();
     }
 
     fn load_connections(&mut self, cx: &mut Context<Self>) {
@@ -239,7 +164,6 @@ impl HomePage {
     }
 
     fn refresh_local_home_data(&mut self, cx: &mut Context<Self>) {
-        self.load_workspaces(cx);
         self.load_connections(cx);
     }
 
@@ -348,64 +272,6 @@ impl HomePage {
         .detach();
     }
 
-    pub(crate) fn show_workspace_form(
-        &mut self,
-        workspace_id: Option<i64>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let workspace_data =
-            workspace_id.and_then(|id| self.workspaces.iter().find(|w| w.id == Some(id)).cloned());
-        self.editing_workspace_id = workspace_id;
-        let view = cx.entity().clone();
-        let is_editing = workspace_id.is_some();
-        let form = cx.new(|cx| {
-            let mut input_state =
-                InputState::new(window, cx).placeholder(t!("Workspace.name_placeholder"));
-            if let Some(ref workspace) = workspace_data {
-                input_state.set_value(workspace.name.clone(), window, cx);
-            }
-            input_state
-        });
-
-        window.open_dialog(cx, move |dialog, _window, _cx| {
-            let form_clone = form.clone();
-            let view_clone = view.clone();
-            let view_clone2 = view.clone();
-            dialog
-                .title(
-                    (if is_editing {
-                        t!("Workspace.edit")
-                    } else {
-                        t!("Workspace.new")
-                    })
-                    .to_string()
-                    .into_any_element(),
-                )
-                .w(px(400.0))
-                .child(Input::new(&form).size_full())
-                .content_center()
-                .confirm()
-                .on_ok(move |_, _window, cx| {
-                    let name = form_clone.read(cx).text().to_string();
-                    if !name.is_empty() {
-                        let _ = view_clone.update(cx, |this, cx| {
-                            this.handle_save_workspace(name, cx);
-                        });
-                        true
-                    } else {
-                        false
-                    }
-                })
-                .on_cancel(move |_, _, cx| {
-                    let _ = view_clone2.update(cx, |this, _| {
-                        this.editing_workspace_id = None;
-                    });
-                    true
-                })
-        });
-    }
-
     pub(crate) fn show_connection_quick_open(
         &mut self,
         window: &mut Window,
@@ -463,144 +329,8 @@ impl HomePage {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let workspace = connection
-            .workspace_id
-            .and_then(|id| self.workspaces.iter().find(|w| w.id == Some(id)).cloned());
-        let strategy = build_connection_open_strategy(connection.clone(), workspace);
-        strategy.open(self, window, cx);
+        self.add_item_to_tab(connection, window, cx);
         cx.notify();
-    }
-
-    fn handle_save_workspace(&mut self, name: String, cx: &mut Context<Self>) {
-        let storage = cx.global::<GlobalStorageState>().storage.clone();
-        let editing_id = self.editing_workspace_id;
-
-        let mut workspace = if let Some(id) = editing_id {
-            // 编辑模式：从现有工作区更新
-            let mut ws = self
-                .workspaces
-                .iter()
-                .find(|w| w.id == Some(id))
-                .cloned()
-                .unwrap_or_else(|| Workspace::new(name.clone()));
-            ws.name = name;
-            ws
-        } else {
-            // 新建模式
-            Workspace::new(name)
-        };
-
-        let result: anyhow::Result<Workspace> = (|| {
-            let repo = storage
-                .get::<WorkspaceRepository>()
-                .ok_or_else(|| anyhow::anyhow!("WorkspaceRepository not found"))?;
-
-            if editing_id.is_some() {
-                repo.update(&mut workspace)?;
-            } else {
-                repo.insert(&mut workspace)?;
-            }
-
-            Ok(workspace)
-        })();
-
-        cx.spawn(async move |this, cx| match result {
-            Ok(workspace) => {
-                _ = this.update(cx, |this, cx| {
-                    let workspace_id = workspace.id.unwrap_or(0);
-                    if let Some(editing_id) = editing_id {
-                        if let Some(pos) = this
-                            .workspaces
-                            .iter()
-                            .position(|w| w.id == Some(editing_id))
-                        {
-                            this.workspaces[pos] = workspace;
-                        }
-                        emit_connection_event(
-                            ConnectionDataEvent::WorkspaceUpdated { workspace_id },
-                            cx,
-                        );
-                    } else {
-                        this.workspaces.push(workspace);
-                        emit_connection_event(
-                            ConnectionDataEvent::WorkspaceCreated { workspace_id },
-                            cx,
-                        );
-                    }
-                    this.editing_workspace_id = None;
-                    cx.notify();
-                });
-            }
-            Err(e) => {
-                tracing::error!("Failed to save workspace: {}", e);
-            }
-        })
-        .detach();
-    }
-
-    pub(crate) fn delete_workspace(
-        &mut self,
-        workspace_id: i64,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let workspace_name = self
-            .workspaces
-            .iter()
-            .find(|w| w.id == Some(workspace_id))
-            .map(|w| w.name.clone())
-            .unwrap_or_default();
-
-        let view = cx.entity().clone();
-        window.open_dialog(cx, move |dialog, _window, _cx| {
-            let view_clone = view.clone();
-            dialog
-                .title(t!("Workspace.delete").to_string().into_any_element())
-                .child(
-                    t!("Workspace.delete_confirm", workspace_name = workspace_name)
-                        .to_string()
-                        .into_any_element(),
-                )
-                .confirm()
-                .on_ok(move |_, _window, cx| {
-                    let _ = view_clone.update(cx, |this, cx| {
-                        this.handle_delete_workspace(workspace_id, cx);
-                    });
-                    true
-                })
-        });
-    }
-
-    fn handle_delete_workspace(&mut self, workspace_id: i64, cx: &mut Context<Self>) {
-        let storage = cx.global::<GlobalStorageState>().storage.clone();
-
-        cx.spawn(async move |this, cx: &mut AsyncApp| {
-            // 删除本地工作空间
-            let result = (|| {
-                let repo = storage
-                    .get::<WorkspaceRepository>()
-                    .ok_or_else(|| anyhow::anyhow!("WorkspaceRepository not found"))?;
-                repo.delete(workspace_id)
-            })();
-
-            match result {
-                Ok(_) => {
-                    _ = this.update(cx, |this, cx| {
-                        this.workspaces.retain(|w| w.id != Some(workspace_id));
-                        this.filtered_workspace_ids.remove(&workspace_id);
-                        emit_connection_event(
-                            ConnectionDataEvent::WorkspaceDeleted { workspace_id },
-                            cx,
-                        );
-                        cx.notify();
-                    });
-                }
-                Err(e) => {
-                    tracing::error!("Failed to delete workspace: {}", e);
-                }
-            }
-        })
-        .detach();
     }
 
     pub(crate) fn show_connection_form(
@@ -616,8 +346,6 @@ impl HomePage {
         let config = ConnectionFormWindowConfig {
             db_type,
             editing_connection: editing_conn,
-            workspaces: self.workspaces.clone(),
-            teams: get_cached_team_options(cx),
         };
 
         self.editing_connection_id = None;
@@ -683,163 +411,7 @@ impl HomePage {
         cx.notify();
     }
 
-    fn render_workspace_filter_popover(
-        &mut self,
-        open: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let view = cx.entity();
-        let view_for_select = view.clone();
-        let view_for_clear = view.clone();
-
-        let list = self.ensure_workspace_filter_list(window, cx);
-
-        let workspaces = &self.workspaces;
-        let connections = &self.connections;
-        let filtered_ids = &self.filtered_workspace_ids;
-        list.update(cx, |state, _cx| {
-            state
-                .delegate_mut()
-                .update_items_with_data(workspaces, connections, filtered_ids);
-        });
-
-        let is_all_selected = self.filtered_workspace_ids.is_empty()
-            || self.filtered_workspace_ids.len()
-                == self.workspaces.iter().filter(|w| w.id.is_some()).count();
-
-        Popover::new("workspace-filter-popover")
-            .trigger(
-                Button::new("workspace-filter")
-                    .icon(IconName::Filter)
-                    .tooltip(t!("Workspace.filter")),
-            )
-            .open(open)
-            .on_open_change(cx.listener(|this, open, _, cx| {
-                this.workspace_filter_open = *open;
-                cx.notify();
-            }))
-            .content(move |_, _, cx| {
-                v_flex()
-                    .w(px(280.0))
-                    .max_h(px(400.0))
-                    .gap_2()
-                    .p_2()
-                    .child(
-                        h_flex()
-                            .w_full()
-                            .items_center()
-                            .justify_between()
-                            .px_1()
-                            .child(
-                                h_flex()
-                                    .gap_2()
-                                    .items_center()
-                                    .child({
-                                        let view_select = view_for_select.clone();
-                                        Checkbox::new("select-all-ws")
-                                            .checked(is_all_selected)
-                                            .on_click(move |_, _, cx| {
-                                                view_select.update(cx, |this, cx| {
-                                                    if this.filtered_workspace_ids.is_empty()
-                                                        || this.filtered_workspace_ids.len()
-                                                            == this
-                                                                .workspaces
-                                                                .iter()
-                                                                .filter(|w| w.id.is_some())
-                                                                .count()
-                                                    {
-                                                        this.clear_workspace_filter(cx);
-                                                    } else {
-                                                        this.select_all_workspaces(cx);
-                                                    }
-                                                });
-                                            })
-                                    })
-                                    .child(div().text_sm().child(
-                                        t!("Workspace.select_all").to_string().into_any_element(),
-                                    )),
-                            )
-                            .child({
-                                let view_clear = view_for_clear.clone();
-                                Button::new("clear-ws-filter")
-                                    .ghost()
-                                    .small()
-                                    .label(t!("Workspace.clear_filter"))
-                                    .on_click(move |_, _, cx| {
-                                        view_clear.update(cx, |this, cx| {
-                                            this.clear_workspace_filter(cx);
-                                        });
-                                    })
-                            }),
-                    )
-                    .child(div().border_t_1().border_color(cx.theme().border))
-                    .child(
-                        List::new(&list)
-                            .w_full()
-                            .max_h(px(320.0))
-                            .p(px(8.))
-                            .flex_1()
-                            .border_1()
-                            .border_color(cx.theme().border)
-                            .rounded(cx.theme().radius),
-                    )
-            })
-            .into_any_element()
-    }
-
-    fn ensure_workspace_filter_list(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Entity<ListState<WorkspaceFilterDelegate>> {
-        if let Some(ref list) = self.workspace_filter_list {
-            return list.clone();
-        }
-
-        let parent = cx.entity();
-        let list = cx.new(|cx| {
-            ListState::new(WorkspaceFilterDelegate::new(parent), window, cx).searchable(true)
-        });
-        self.workspace_filter_list = Some(list.clone());
-        list
-    }
-
-    pub(crate) fn toggle_workspace_filter(&mut self, workspace_id: i64, cx: &mut Context<Self>) {
-        if self.filtered_workspace_ids.is_empty() {
-            for ws in &self.workspaces {
-                if let Some(id) = ws.id {
-                    self.filtered_workspace_ids.insert(id);
-                }
-            }
-        }
-
-        if self.filtered_workspace_ids.contains(&workspace_id) {
-            self.filtered_workspace_ids.remove(&workspace_id);
-        } else {
-            self.filtered_workspace_ids.insert(workspace_id);
-        }
-        cx.notify();
-    }
-
-    fn select_all_workspaces(&mut self, cx: &mut Context<Self>) {
-        self.filtered_workspace_ids.clear();
-        for ws in &self.workspaces {
-            if let Some(id) = ws.id {
-                self.filtered_workspace_ids.insert(id);
-            }
-        }
-        cx.notify();
-    }
-
-    fn clear_workspace_filter(&mut self, cx: &mut Context<Self>) {
-        self.filtered_workspace_ids.clear();
-        cx.notify();
-    }
-
-    fn render_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let view = cx.entity().clone();
-
+    fn render_sidebar(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // 简化的连接列表（不按工作区分组）
         let connections: Vec<_> = self.connections.clone();
 
@@ -879,52 +451,10 @@ impl HomePage {
                             .w_full()
                             .justify_start()
                             .on_click(move |_, _window, cx| {
-                                crate::settings_window::open_settings_window(cx);
+                                crate::settings::settings_window::open_settings_window(cx);
                             }),
                     )
             )
-    }
-
-    fn match_connection(&self, conn: &StoredConnection, query: &str) -> bool {
-        if query.is_empty() {
-            return true;
-        }
-
-        // 匹配连接名称
-        if conn.name.to_lowercase().contains(query) {
-            return true;
-        }
-
-        // 根据连接类型解析对应参数进行匹配
-        match conn.connection_type {
-            ConnectionType::Database => {
-                if let Ok(params) = conn.to_db_connection() {
-                    if params.host.to_lowercase().contains(query) {
-                        return true;
-                    }
-                    if params.port.to_string().contains(query) {
-                        return true;
-                    }
-                    if params.username.to_lowercase().contains(query) {
-                        return true;
-                    }
-                    if params
-                        .database
-                        .as_ref()
-                        .map_or(false, |db| db.to_lowercase().contains(query))
-                    {
-                        return true;
-                    }
-                    let conn_str = format!("{}@{}:{}", params.username, params.host, params.port);
-                    if conn_str.to_lowercase().contains(query) {
-                        return true;
-                    }
-                }
-            }
-            _ => {}
-        }
-
-        false
     }
 
     fn render_content_area(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -944,7 +474,7 @@ impl HomePage {
         self.render_welcome(cx).into_any_element()
     }
 
-    fn render_empty_state(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_empty_state(&self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let view = cx.entity().clone();
         v_flex()
             .size_full()
@@ -1241,221 +771,6 @@ impl HomePage {
             )
     }
 
-    fn render_workspace_view(
-        &self,
-        search_query: &str,
-        selected_id: Option<i64>,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let workspaces_with_connections: Vec<_> = self
-            .workspaces
-            .iter()
-            .filter(|ws| {
-                if self.filtered_workspace_ids.is_empty() {
-                    return true;
-                }
-                match ws.id {
-                    Some(id) => self.filtered_workspace_ids.contains(&id),
-                    None => true,
-                }
-            })
-            .map(|ws| {
-                let conn_list: Vec<_> = self
-                    .connections
-                    .iter()
-                    .filter(|conn| conn.workspace_id == ws.id)
-                    .filter(|conn| self.match_connection(conn, search_query))
-                    .cloned()
-                    .collect();
-                (ws.clone(), conn_list)
-            })
-            .collect();
-
-        let unassigned_connections: Vec<_> = self
-            .connections
-            .iter()
-            .filter(|conn| conn.workspace_id.is_none())
-            .filter(|conn| self.match_connection(conn, search_query))
-            .cloned()
-            .collect();
-
-        div()
-            .id("home-content")
-            .size_full()
-            .overflow_y_scroll()
-            .p_6()
-            .child({
-                let mut container = v_flex().gap_8().w_full();
-
-                // 过滤掉空的工作区
-                for (workspace, connections) in workspaces_with_connections {
-                    if connections.is_empty() {
-                        continue;
-                    }
-                    container = container.child(self.render_workspace_section(
-                        workspace,
-                        connections,
-                        selected_id,
-                        cx,
-                    ));
-                }
-
-                // 如果用户没有设置工作区，直接显示连接列表；否则显示未分配工作区
-                if !unassigned_connections.is_empty() {
-                    let has_workspaces = self.workspaces.iter().any(|ws| ws.id.is_some());
-                    if has_workspaces {
-                        container = container.child(self.render_unassigned_section(
-                            unassigned_connections,
-                            selected_id,
-                            cx,
-                        ));
-                    } else {
-                        // 没有工作区时，直接显示连接卡片
-                        container = container.child(self.render_connections_grid(
-                            unassigned_connections,
-                            selected_id,
-                            cx,
-                        ));
-                    }
-                }
-
-                container
-            })
-    }
-
-    fn render_workspace_section(
-        &self,
-        workspace: Workspace,
-        connections: Vec<StoredConnection>,
-        selected_id: Option<i64>,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let workspace_id = workspace.id;
-        v_flex()
-            .gap_3()
-            .child(
-                h_flex()
-                    .items_center()
-                    .gap_2()
-                    .px_2()
-                    .py_1()
-                    .child(
-                        Icon::new(IconName::AppsColor)
-                            .color()
-                            .with_size(Size::Medium),
-                    )
-                    .child(
-                        div()
-                            .id(ElementId::Name(SharedString::from(format!(
-                                "workspace-name-{}",
-                                workspace_id.unwrap_or(0)
-                            ))))
-                            .text_base()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(cx.theme().foreground)
-                            .child(workspace.name.clone()),
-                    )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(
-                                t!("Home.connection_count", count = connections.len()).to_string(),
-                            ),
-                    )
-                    .child(div().flex_1()),
-            )
-            .when(!connections.is_empty(), |this| {
-                // 使用 flex 布局实现响应式卡片网格
-                let mut container = div().flex().flex_wrap().w_full().gap_3();
-
-                for conn in connections {
-                    container = container.child(
-                        div()
-                            .w(px(320.0)) // 固定宽度，不增长
-                            .flex_shrink_0() // 不收缩
-                            .child(self.render_connection_card(
-                                conn,
-                                workspace_id,
-                                selected_id,
-                                cx,
-                            )),
-                    );
-                }
-
-                this.child(container)
-            })
-    }
-
-    fn render_connections_grid(
-        &self,
-        connections: Vec<StoredConnection>,
-        selected_id: Option<i64>,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let mut container = div().flex().flex_wrap().w_full().gap_3();
-
-        for conn in connections {
-            container = container.child(
-                div()
-                    .w(px(320.0))
-                    .flex_shrink_0()
-                    .child(self.render_connection_card(conn, None, selected_id, cx)),
-            );
-        }
-        container
-    }
-
-    fn render_unassigned_section(
-        &self,
-        connections: Vec<StoredConnection>,
-        selected_id: Option<i64>,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        v_flex()
-            .gap_3()
-            .child(
-                h_flex()
-                    .items_center()
-                    .gap_2()
-                    .px_2()
-                    .py_1()
-                    .child(
-                        div()
-                            .text_base()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(cx.theme().foreground)
-                            .child(
-                                t!("Home.unassigned_workspace")
-                                    .to_string()
-                                    .into_any_element(),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(
-                                t!("Home.connection_count", count = connections.len()).to_string(),
-                            ),
-                    ),
-            )
-            .child({
-                // 使用 flex 布局实现响应式卡片网格
-                let mut container = div().flex().flex_wrap().w_full().gap_3();
-
-                for conn in connections {
-                    container = container.child(
-                        div()
-                            .w(px(320.0)) // 固定宽度，不增长
-                            .flex_shrink_0() // 不收缩
-                            .child(self.render_connection_card(conn, None, selected_id, cx)),
-                    );
-                }
-                container
-            })
-    }
-
     fn render_sidebar_connection_item(
         &self,
         conn: StoredConnection,
@@ -1470,11 +785,6 @@ impl HomePage {
         let edit_conn = conn.clone();
         let delete_conn_id = conn.id;
         let delete_conn_name = conn.name.clone();
-
-        // 获取连接的工作区
-        let workspace = conn.workspace_id.and_then(|id| {
-            self.workspaces.iter().find(|w| w.id == Some(id)).cloned()
-        });
 
         let item = div()
             .id(SharedString::from(format!("sidebar-conn-{}", conn_id.unwrap_or(0))))
@@ -1491,9 +801,7 @@ impl HomePage {
                 cx.notify();
             }))
             .on_double_click(cx.listener(move |this, _, w, cx| {
-                let strategy =
-                    build_connection_open_strategy(clone_conn.clone(), workspace.clone());
-                strategy.open(this, w, cx);
+                this.add_item_to_tab(&clone_conn, w, cx);
             }))
             .child(
                 h_flex()
@@ -1575,7 +883,6 @@ impl HomePage {
     fn render_connection_card(
         &self,
         conn: StoredConnection,
-        workspace_id: Option<i64>,
         selected_id: Option<i64>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -1587,15 +894,13 @@ impl HomePage {
         let delete_conn_id = conn.id;
         let delete_conn_name = conn.name.clone();
         let is_selected = selected_id == conn.id;
-        let workspace =
-            workspace_id.and_then(|id| self.workspaces.iter().find(|w| w.id == Some(id)).cloned());
 
         let is_active = conn
             .id
             .map_or(false, |id| cx.global::<ActiveConnections>().is_active(id));
 
-        let can_edit = can_edit_connection(&conn, cx);
-        let has_team = conn.team_id.is_some();
+        let can_edit = true;
+        let has_team = false;
 
         let card = v_flex()
             .justify_center()
@@ -1627,9 +932,7 @@ impl HomePage {
                     .border_color(cx.theme().list_active_border)
             })
             .on_double_click(cx.listener(move |this, _, w, cx| {
-                let strategy =
-                    build_connection_open_strategy(clone_conn.clone(), workspace.clone());
-                strategy.open(this, w, cx);
+                this.add_item_to_tab(&clone_conn, w, cx);
                 cx.notify()
             }))
             .on_click(cx.listener(move |this, _, _, cx| {
@@ -1822,6 +1125,44 @@ impl HomePage {
             );
 
         card.into_any_element()
+    }
+
+    pub(crate) fn add_item_to_tab(
+        &mut self,
+        conn: &StoredConnection,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let conn_clone = conn.clone();
+        let tab_container = self.tab_container.clone();
+
+        window.defer(cx, move |window, cx| {
+            tab_container.update(cx, |tc, cx| {
+                let tab_id = format!("database-tab-{}", conn_clone.id.unwrap_or(0));
+                tc.activate_or_add_tab_lazy(
+                    tab_id.clone(),
+                    move |window, cx| {
+                        let db_view = cx.new(|cx| {
+                            DatabaseTabView::new_with_active_conn(
+                                None,
+                                vec![conn_clone.clone()],
+                                conn_clone.id,
+                                window,
+                                cx,
+                            )
+                        });
+                        TabItem::new(tab_id.clone(), "home", db_view)
+                    },
+                    window,
+                    cx,
+                );
+            });
+        });
+    }
+
+    /// 复制当前活动标签并打开
+    pub(crate) fn duplicate_active_tab(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {
+        // Terminal 复制功能已移除
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::home_tab::{HomePage, NewConnectionShortcut, OpenConnectionQuickOpen};
+use crate::home::home_tab::{HomePage, NewConnectionShortcut, OpenConnectionQuickOpen};
 use gpui::{
     App, AppContext, Context, Entity, IntoElement, KeyBinding, ParentElement, Render, Styled, Task,
     Window, actions, div,
@@ -151,7 +151,7 @@ pub fn init(cx: &mut App) {
         cache.start_cleanup_task(cx);
     }
     db_view::init(cx);
-    crate::home_tab::init(cx);
+    crate::home::home_tab::init(cx);
     cx.bind_keys(vec![
         KeyBinding::new("shift-escape", ToggleZoom, None),
         KeyBinding::new("ctrl-w", ClosePanel, None),
@@ -226,7 +226,7 @@ pub fn init(cx: &mut App) {
     cx.on_action(|_: &MinimizeWindow, cx| minimize_window(cx));
     cx.on_action(|_: &DuplicateTab, cx| duplicate_tab(cx));
     cx.on_action(|_: &QuitApp, cx| quit_app(cx));
-    cx.on_action(|_: &OpenSettings, cx| crate::settings_window::open_settings_window(cx));
+    cx.on_action(|_: &OpenSettings, cx| crate::settings::settings_window::open_settings_window(cx));
     cx.on_action(|_: &OpenConnectionQuickOpen, cx| {
         let Some(active_window) = cx.active_window() else {
             return;

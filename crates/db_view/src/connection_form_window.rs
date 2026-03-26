@@ -10,9 +10,8 @@ use gpui_component::{
     scroll::ScrollableElement,
     v_flex,
 };
-use one_core::TeamOption;
 use one_core::connection_notifier::{ConnectionDataEvent, emit_connection_event};
-use one_core::storage::{DatabaseType, StoredConnection, Workspace};
+use one_core::storage::{DatabaseType, StoredConnection};
 use rust_i18n::t;
 
 use crate::common::db_connection_form::{DbConnectionForm, DbConnectionFormEvent};
@@ -22,8 +21,6 @@ use crate::database_view_plugin::DatabaseViewPluginRegistry;
 pub struct ConnectionFormWindowConfig {
     pub db_type: DatabaseType,
     pub editing_connection: Option<StoredConnection>,
-    pub workspaces: Vec<Workspace>,
-    pub teams: Vec<TeamOption>,
 }
 
 /// 连接表单窗口
@@ -57,11 +54,6 @@ impl ConnectionFormWindow {
             .expect("Plugin should exist for db_type");
 
         let form = plugin.create_connection_form(window, cx);
-
-        form.update(cx, |f, cx| {
-            f.set_workspaces(config.workspaces.clone(), window, cx);
-            f.set_teams(config.teams.clone(), window, cx);
-        });
 
         if let Some(ref conn) = config.editing_connection {
             form.update(cx, |f, cx| {

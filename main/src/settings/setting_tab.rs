@@ -56,22 +56,6 @@ pub struct AppSettings {
     pub font_family: String,
     #[serde(default = "default_font_size")]
     pub font_size: f64,
-    #[serde(default = "default_terminal_font_size")]
-    pub terminal_font_size: f64,
-    #[serde(default = "default_true")]
-    pub terminal_auto_copy: bool,
-    #[serde(default = "default_true")]
-    pub terminal_middle_click_paste: bool,
-    #[serde(default)]
-    pub terminal_sync_path_with_terminal: bool,
-    #[serde(default = "default_terminal_theme")]
-    pub terminal_theme: String,
-    #[serde(default)]
-    pub terminal_cursor_blink: bool,
-    #[serde(default = "default_true")]
-    pub terminal_confirm_multiline_paste: bool,
-    #[serde(default = "default_true")]
-    pub terminal_confirm_high_risk_command: bool,
     #[serde(default = "default_true")]
     pub auto_update: bool,
     #[serde(default)]
@@ -95,14 +79,6 @@ fn default_font_size() -> f64 {
     14.0
 }
 
-fn default_terminal_font_size() -> f64 {
-    15.0
-}
-
-fn default_terminal_theme() -> String {
-    "ocean".to_string()
-}
-
 fn default_true() -> bool {
     true
 }
@@ -119,14 +95,6 @@ impl Default for AppSettings {
             auto_switch_theme: false,
             font_family: default_font_family(),
             font_size: default_font_size(),
-            terminal_font_size: default_terminal_font_size(),
-            terminal_auto_copy: default_true(),
-            terminal_middle_click_paste: default_true(),
-            terminal_sync_path_with_terminal: false,
-            terminal_theme: default_terminal_theme(),
-            terminal_cursor_blink: false,
-            terminal_confirm_multiline_paste: default_true(),
-            terminal_confirm_high_risk_command: default_true(),
             auto_update: true,
             database_open_mode: DatabaseOpenMode::default(),
             enable_sql_auto_save: true,
@@ -321,49 +289,6 @@ const TAB_SHORTCUTS: &[ShortcutEntry] = &[
     },
 ];
 
-const TERMINAL_SHORTCUTS: &[ShortcutEntry] = &[
-    ShortcutEntry {
-        key_macos: "cmd-c",
-        key_other: "ctrl-shift-c",
-        label_key: "Settings.Shortcuts.terminal_copy",
-    },
-    ShortcutEntry {
-        key_macos: "cmd-v",
-        key_other: "ctrl-shift-v",
-        label_key: "Settings.Shortcuts.terminal_paste",
-    },
-    ShortcutEntry {
-        key_macos: "cmd-f",
-        key_other: "ctrl-shift-f",
-        label_key: "Settings.Shortcuts.terminal_search",
-    },
-    ShortcutEntry {
-        key_macos: "cmd-a",
-        key_other: "ctrl-shift-a",
-        label_key: "Settings.Shortcuts.terminal_select_all",
-    },
-    ShortcutEntry {
-        key_macos: "cmd-+",
-        key_other: "ctrl-+",
-        label_key: "Settings.Shortcuts.terminal_zoom_in",
-    },
-    ShortcutEntry {
-        key_macos: "cmd--",
-        key_other: "ctrl--",
-        label_key: "Settings.Shortcuts.terminal_zoom_out",
-    },
-    ShortcutEntry {
-        key_macos: "cmd-0",
-        key_other: "ctrl-0",
-        label_key: "Settings.Shortcuts.terminal_zoom_reset",
-    },
-    ShortcutEntry {
-        key_macos: "f7",
-        key_other: "f7",
-        label_key: "Settings.Shortcuts.terminal_toggle_vi",
-    },
-];
-
 const SHORTCUT_GROUPS: &[ShortcutGroup] = &[
     ShortcutGroup {
         title_key: "Settings.Shortcuts.window",
@@ -372,10 +297,6 @@ const SHORTCUT_GROUPS: &[ShortcutGroup] = &[
     ShortcutGroup {
         title_key: "Settings.Shortcuts.tabs",
         entries: TAB_SHORTCUTS,
-    },
-    ShortcutGroup {
-        title_key: "Settings.Shortcuts.terminal",
-        entries: TERMINAL_SHORTCUTS,
     },
 ];
 

@@ -11,7 +11,7 @@ use gpui_component::{
 use one_core::popup_window::{open_popup_window, PopupWindowOptions};
 use rust_i18n::t;
 
-use crate::setting_tab::{
+use super::setting_tab::{
     init_settings, render_about_section, render_shortcuts_section, AppSettings, DatabaseOpenMode,
 };
 use crate::settings::llm_providers_view::LlmProvidersView;
@@ -194,60 +194,6 @@ impl SettingsWindow {
                             )
                             .description(t!("Settings.General.Font.font_size_desc").to_string()),
                         ),
-                    SettingGroup::new()
-                        .title(t!("Settings.General.Terminal.group_title"))
-                        .items(vec![
-                            SettingItem::new(
-                                t!("Settings.General.Terminal.font_size"),
-                                SettingField::number_input(
-                                    NumberFieldOptions {
-                                        min: 8.0,
-                                        max: 72.0,
-                                        ..Default::default()
-                                    },
-                                    |cx: &App| AppSettings::global(cx).terminal_font_size,
-                                    |val: f64, cx: &mut App| {
-                                        let settings = AppSettings::global_mut(cx);
-                                        settings.terminal_font_size = val;
-                                        settings.save();
-                                    },
-                                )
-                                .default_value(default_settings.terminal_font_size),
-                            )
-                            .description(
-                                t!("Settings.General.Terminal.font_size_desc").to_string(),
-                            ),
-                            SettingItem::new(
-                                t!("Settings.General.Terminal.auto_copy"),
-                                SettingField::switch(
-                                    |cx: &App| AppSettings::global(cx).terminal_auto_copy,
-                                    |val: bool, cx: &mut App| {
-                                        let settings = AppSettings::global_mut(cx);
-                                        settings.terminal_auto_copy = val;
-                                        settings.save();
-                                    },
-                                )
-                                .default_value(default_settings.terminal_auto_copy),
-                            )
-                            .description(
-                                t!("Settings.General.Terminal.auto_copy_desc").to_string(),
-                            ),
-                            SettingItem::new(
-                                t!("Settings.General.Terminal.middle_click_paste"),
-                                SettingField::switch(
-                                    |cx: &App| AppSettings::global(cx).terminal_middle_click_paste,
-                                    |val: bool, cx: &mut App| {
-                                        let settings = AppSettings::global_mut(cx);
-                                        settings.terminal_middle_click_paste = val;
-                                        settings.save();
-                                    },
-                                )
-                                .default_value(default_settings.terminal_middle_click_paste),
-                            )
-                            .description(
-                                t!("Settings.General.Terminal.middle_click_paste_desc").to_string(),
-                            ),
-                        ]),
                     SettingGroup::new()
                         .title(t!("Settings.General.Database.group_title"))
                         .items(vec![

@@ -15,7 +15,7 @@ use serde::Deserialize;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
-use crate::setting_tab::AppSettings;
+use crate::settings::setting_tab::AppSettings;
 use one_core::config::UpdateConfig;
 
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");

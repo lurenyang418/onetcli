@@ -4,9 +4,8 @@
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, App, AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable,
-    InteractiveElement, IntoElement, ParentElement, Render, SharedString,
-    StatefulInteractiveElement, Styled, Subscription, Window, div, px,
+    AnyElement, App, AppContext, Context, EventEmitter, FocusHandle, Focusable,
+    InteractiveElement, IntoElement, ParentElement, Render, SharedString, Styled, Subscription, Window, div, px,
 };
 use gpui_component::{ActiveTheme, Icon, IconName, Sizable, Size, v_flex};
 use one_core::ai_chat::CodeBlockAction;
@@ -83,7 +82,7 @@ impl DatabaseSidebar {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let accent_color = cx.theme().accent;
-        let accent_fg = cx.theme().accent_foreground;
+        let _accent_fg = cx.theme().accent_foreground;
         let muted_fg = cx.theme().muted_foreground;
         let muted_bg = cx.theme().muted;
 
@@ -106,7 +105,7 @@ impl DatabaseSidebar {
     }
 
     /// 渲染工具栏
-    pub fn render_toolbar(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    pub fn render_toolbar(&self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let border_color = cx.theme().border;
         let muted_bg = cx.theme().muted;
 
@@ -144,7 +143,7 @@ impl Focusable for DatabaseSidebar {
 
 impl Render for DatabaseSidebar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let border_color = cx.theme().border;
+        let _border_color = cx.theme().border;
 
         div()
             .h_full()

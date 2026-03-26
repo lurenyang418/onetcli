@@ -31,7 +31,10 @@
       "Bash(grep -rn \"remove_window\\\\|close_window\" /Users/renylu/.cargo/registry/src/*/gpui-*/src/window.rs)",
       "Bash(grep -rn \"fn on_action\\\\|trait.*Action\" /Users/renylu/project/github-app/onetcli/crates/ui/src/*.rs)",
       "Bash(grep -rn \"KeyCode\\\\|KeyDownEvent\\\\|KeyListener\" /Users/renylu/.cargo/registry/src/*/gpui-*/src/window.rs)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(cargo machete:*)",
+      "Bash(cargo fix:*)",
+      "Bash(ls:*)"
     ]
   }
 }
