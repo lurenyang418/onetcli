@@ -777,7 +777,7 @@ impl TableDesigner {
         } else {
             base_type.clone()
         };
-        let is_auto_increment = if database_type == DatabaseType::SQLite {
+        let is_auto_increment = if database_type == DatabaseType::PostgreSQL {
             col.is_primary_key && base_type.eq_ignore_ascii_case("INTEGER")
         } else {
             parsed.is_auto_increment
@@ -2036,7 +2036,7 @@ impl ColumnsEditor {
                 scale_input,
                 nullable: col.is_nullable,
                 is_pk: col.is_primary_key,
-                auto_increment: if self.database_type == DatabaseType::SQLite {
+                auto_increment: if self.database_type == DatabaseType::PostgreSQL {
                     col.is_primary_key && parsed_type.base_type.eq_ignore_ascii_case("INTEGER")
                 } else {
                     parsed_type.is_auto_increment
@@ -3066,10 +3066,7 @@ impl Render for TableOptionsEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db::{
-        mysql::MySqlPlugin,
-        plugin::DatabasePlugin, postgresql::PostgresPlugin, sqlite::SqlitePlugin,
-    };
+    use db::{plugin::DatabasePlugin, postgresql::PostgresPlugin};
 
     fn build_col(name: &str) -> ColumnDefinition {
         ColumnDefinition {
@@ -3109,9 +3106,7 @@ mod tests {
 
     fn build_plugin(database_type: DatabaseType) -> Box<dyn DatabasePlugin> {
         match database_type {
-            DatabaseType::MySQL => Box::new(MySqlPlugin::new()),
             DatabaseType::PostgreSQL => Box::new(PostgresPlugin::new()),
-            DatabaseType::SQLite => Box::new(SqlitePlugin::new()),
         }
     }
 
@@ -3128,27 +3123,10 @@ mod tests {
 
     fn assert_contains_rename_sql(sql: &str, database_type: DatabaseType) {
         match database_type {
-            DatabaseType::MySQL => {
-                assert!(
-                    sql.contains("CHANGE COLUMN"),
-                    "MySQL 应使用 CHANGE COLUMN: {sql}"
-                );
-                assert!(sql.contains("`b`"), "MySQL 重命名 SQL 应包含源列 b: {sql}");
-                assert!(
-                    sql.contains("`a`"),
-                    "MySQL 重命名 SQL 应包含目标列 a: {sql}"
-                );
-            }
             DatabaseType::PostgreSQL => {
                 assert!(
                     sql.contains("RENAME COLUMN \"b\" TO \"a\""),
                     "PostgreSQL 应使用 RENAME COLUMN: {sql}"
-                );
-            }
-            DatabaseType::SQLite => {
-                assert!(
-                    sql.contains("RENAME COLUMN \"b\" TO \"a\""),
-                    "SQLite 应使用 RENAME COLUMN: {sql}"
                 );
             }
         }
@@ -3208,42 +3186,10 @@ mod tests {
     }
 
     #[test]
-    fn test_mysql_rename_sql_uses_change_column() {
-        let plugin = MySqlPlugin::new();
-        let col = build_col("a");
-        let sql = plugin.build_column_rename_sql("users", "b", "a", Some(&col));
-        assert!(sql.contains("CHANGE COLUMN"));
-    }
-
-    #[test]
     fn test_postgresql_rename_sql_uses_rename_column() {
         let plugin = PostgresPlugin::new();
         let sql = plugin.build_column_rename_sql("users", "b", "a", None);
         assert!(sql.contains("RENAME COLUMN \"b\" TO \"a\""));
-    }
-
-    #[test]
-    fn test_sqlite_rename_sql_uses_rename_column() {
-        let plugin = SqlitePlugin::new();
-        let sql = plugin.build_column_rename_sql("users", "b", "a", None);
-        assert!(sql.contains("RENAME COLUMN \"b\" TO \"a\""));
-    }
-
-    #[test]
-    fn test_mysql_change_column_keeps_new_definition() {
-        let plugin = MySqlPlugin::new();
-        let mut renamed_col = build_col("a");
-        renamed_col.data_type = "BIGINT".to_string();
-        renamed_col.is_nullable = true;
-
-        let sql = plugin.build_column_rename_sql("users", "b", "a", Some(&renamed_col));
-
-        assert!(sql.contains("`a` BIGINT"));
-        assert!(
-            !sql.contains("NOT NULL"),
-            "nullable=true 时不应强制生成 NOT NULL: {}",
-            sql
-        );
     }
 
     #[test]
@@ -3301,18 +3247,6 @@ mod tests {
                 "[{:?}] 简单重命名不应生成 DROP COLUMN: {sql}",
                 database_type
             );
-            // 不应包含 ADD COLUMN b2
-            let add_b2 = format!("ADD COLUMN {}", plugin.quote_identifier("b2"));
-            // MySQL ADD COLUMN 可能不包含引号后的完整格式，用更宽松的匹配
-            let add_keyword = "ADD COLUMN";
-            if database_type != DatabaseType::SQLite {
-                assert!(
-                    !sql.contains(&add_b2)
-                        && (!sql.contains(add_keyword) || sql.contains("RENAME")),
-                    "[{:?}] 简单重命名不应生成 ADD COLUMN: {sql}",
-                    database_type
-                );
-            }
             // 应包含 RENAME 相关语句
             let has_rename = sql.contains("RENAME COLUMN")
                 || sql.contains("CHANGE COLUMN")
@@ -3439,14 +3373,11 @@ mod tests {
         for database_type in DatabaseType::all().iter().copied() {
             let plugin = build_plugin(database_type);
             let sql = plugin.build_alter_table_sql(&original, &current);
-            // SQLite 使用 table recreation 方式，不包含 DROP COLUMN 关键词
-            if database_type != DatabaseType::SQLite {
-                assert!(
-                    sql.contains("DROP COLUMN"),
-                    "[{:?}] 删除列应包含 DROP COLUMN: {sql}",
-                    database_type
-                );
-            }
+            assert!(
+                sql.contains("DROP COLUMN"),
+                "[{:?}] 删除列应包含 DROP COLUMN: {sql}",
+                database_type
+            );
             assert!(
                 !sql.starts_with("-- No changes"),
                 "[{:?}] 删除列不应返回 no changes: {sql}",
@@ -3557,15 +3488,13 @@ mod tests {
                 database_type
             );
             // SQLite 使用 table recreation，不直接包含 DROP COLUMN
-            if database_type != DatabaseType::SQLite {
-                // 应 DROP 被删除的列 c
-                let drop_c = format!("DROP COLUMN {}", plugin.quote_identifier("c"));
-                assert!(
-                    sql.contains(&drop_c),
-                    "[{:?}] 应 DROP 被删除的列 c: {sql}",
-                    database_type
-                );
-            }
+            // 应 DROP 被删除的列 c
+            let drop_c = format!("DROP COLUMN {}", plugin.quote_identifier("c"));
+            assert!(
+                sql.contains(&drop_c),
+                "[{:?}] 应 DROP 被删除的列 c: {sql}",
+                database_type
+            );
         }
     }
 
@@ -3838,61 +3767,6 @@ mod tests {
         );
     }
 
-    /// MySQL build_column_rename_sql 无列定义时回退为 RENAME COLUMN
-    #[test]
-    fn test_mysql_rename_sql_fallback_without_column_def() {
-        let plugin = MySqlPlugin::new();
-        let sql = plugin.build_column_rename_sql("users", "old_col", "new_col", None);
-        assert!(
-            sql.contains("RENAME COLUMN"),
-            "MySQL 无列定义时应回退为 RENAME COLUMN: {sql}"
-        );
-        assert!(
-            !sql.contains("CHANGE COLUMN"),
-            "MySQL 无列定义时不应使用 CHANGE COLUMN: {sql}"
-        );
-    }
-
-    /// MySQL CHANGE COLUMN 保留 default 值和 comment
-    #[test]
-    fn test_mysql_change_column_preserves_default_and_comment() {
-        let plugin = MySqlPlugin::new();
-        let col = ColumnDefinition {
-            name: "new_name".to_string(),
-            data_type: "VARCHAR".to_string(),
-            length: Some(100),
-            is_nullable: true,
-            default_value: Some("'hello'".to_string()),
-            comment: "用户名字段".to_string(),
-            ..Default::default()
-        };
-        let sql = plugin.build_column_rename_sql("users", "old_name", "new_name", Some(&col));
-        assert!(sql.contains("CHANGE COLUMN"), "应使用 CHANGE COLUMN: {sql}");
-        assert!(sql.contains("DEFAULT 'hello'"), "应保留 DEFAULT 值: {sql}");
-        assert!(
-            sql.contains("COMMENT '用户名字段'"),
-            "应保留 COMMENT: {sql}"
-        );
-    }
-
-    /// MySQL CHANGE COLUMN 保留 auto_increment
-    #[test]
-    fn test_mysql_change_column_preserves_auto_increment() {
-        let plugin = MySqlPlugin::new();
-        let col = ColumnDefinition {
-            name: "id".to_string(),
-            data_type: "INT".to_string(),
-            is_nullable: false,
-            is_auto_increment: true,
-            ..Default::default()
-        };
-        let sql = plugin.build_column_rename_sql("users", "old_id", "id", Some(&col));
-        assert!(
-            sql.contains("AUTO_INCREMENT"),
-            "应保留 AUTO_INCREMENT: {sql}"
-        );
-    }
-
     /// build_alter_table_sql_with_renames 传入空设计（无列、无索引）
     #[test]
     fn test_alter_table_with_renames_empty_designs() {
@@ -3919,22 +3793,11 @@ mod tests {
                 || sql.contains("CHANGE COLUMN")
                 || sql.contains("sp_rename");
             assert!(has_rename, "[{:?}] 应包含重命名 SQL: {sql}", database_type);
-            // 对于 MySQL 的 CHANGE COLUMN，类型变更和重命名合为一条
-            // 对于其他数据库，类型变更和重命名分别生成
-            if database_type == DatabaseType::MySQL {
-                // MySQL CHANGE COLUMN 自带完整列定义，包含新类型
-                assert!(
-                    sql.contains("BIGINT"),
-                    "[MySQL] CHANGE COLUMN 应包含新类型 BIGINT: {sql}"
-                );
-            } else {
-                // 其他数据库应同时包含 RENAME 和 ALTER COLUMN（类型变更）
-                assert!(
-                    sql.contains("BIGINT"),
-                    "[{:?}] 应包含类型变更 BIGINT: {sql}",
-                    database_type
-                );
-            }
+            assert!(
+                sql.contains("BIGINT"),
+                "[{:?}] 应包含类型变更 BIGINT: {sql}",
+                database_type
+            );
         }
     }
 
@@ -4025,8 +3888,8 @@ mod tests {
         };
         let current = build_design(vec![build_col("id"), new_col], vec![]);
 
-        // MySQL 支持 COMMENT 和 DEFAULT
-        let plugin = MySqlPlugin::new();
+        // PostgreSQL 支持 COMMENT 和 DEFAULT
+        let plugin = PostgresPlugin::new();
         let sql = plugin.build_alter_table_sql(&original, &current);
         assert!(sql.contains("VARCHAR(255)"), "应包含类型和长度: {sql}");
         assert!(sql.contains("DEFAULT ''"), "应包含 DEFAULT: {sql}");
@@ -4067,10 +3930,10 @@ mod tests {
             charset: Some("utf8mb4".to_string()),
             collation: Some("utf8mb4_general_ci".to_string()),
         };
-        let parsed = MySqlPlugin::new().parse_column_type(&column.data_type);
+        let parsed = PostgresPlugin::new().parse_column_type(&column.data_type);
 
         let definition =
-            TableDesigner::column_info_to_definition(DatabaseType::MySQL, &column, parsed);
+            TableDesigner::column_info_to_definition(DatabaseType::PostgreSQL, &column, parsed);
 
         assert_eq!(definition.data_type, "varchar");
         assert_eq!(definition.length, Some(255));
@@ -4103,14 +3966,14 @@ mod tests {
         };
 
         let numeric_definition = TableDesigner::column_info_to_definition(
-            DatabaseType::MySQL,
+            DatabaseType::PostgreSQL,
             &numeric,
-            MySqlPlugin::new().parse_column_type(&numeric.data_type),
+            PostgresPlugin::new().parse_column_type(&numeric.data_type),
         );
         let enum_definition = TableDesigner::column_info_to_definition(
-            DatabaseType::MySQL,
+            DatabaseType::PostgreSQL,
             &enum_col,
-            MySqlPlugin::new().parse_column_type(&enum_col.data_type),
+            PostgresPlugin::new().parse_column_type(&enum_col.data_type),
         );
 
         assert!(numeric_definition.is_unsigned);

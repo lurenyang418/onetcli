@@ -360,7 +360,7 @@ impl DatabaseObjects {
                 let db_type = stored_conn
                     .to_db_connection()
                     .map(|c| c.database_type)
-                    .unwrap_or(DatabaseType::MySQL);
+                    .unwrap_or(DatabaseType::PostgreSQL);
                 let connection_id = stored_conn.id.map(|id| id.to_string()).unwrap_or_default();
                 vec![
                     stored_conn.name.clone(),
@@ -473,7 +473,7 @@ impl DatabaseObjects {
         if self.current_node.is_none() && db_node_type == DbNodeType::Connection {
             let connection_id = row_data.get(1).cloned().unwrap_or_default();
             let db_type_str = row_data.get(2).cloned().unwrap_or_default();
-            let database_type = DatabaseType::from_str(&db_type_str).unwrap_or(DatabaseType::MySQL);
+            let database_type = DatabaseType::from_str(&db_type_str).unwrap_or(DatabaseType::PostgreSQL);
 
             return Some(DbNode::new(
                 connection_id.clone(),
@@ -501,7 +501,7 @@ impl DatabaseObjects {
                     let row_connection_id = row_data.get(1).cloned().unwrap_or_default();
                     let db_type_str = row_data.get(2).cloned().unwrap_or_default();
                     let row_database_type =
-                        DatabaseType::from_str(&db_type_str).unwrap_or(DatabaseType::MySQL);
+                        DatabaseType::from_str(&db_type_str).unwrap_or(DatabaseType::PostgreSQL);
                     return Some(DbNode::new(
                         row_connection_id.clone(),
                         name,
@@ -785,7 +785,7 @@ impl DatabaseObjects {
         let database_type = current_node
             .as_ref()
             .map(|n| n.database_type)
-            .unwrap_or(DatabaseType::MySQL);
+            .unwrap_or(DatabaseType::PostgreSQL);
 
         buttons.push({
             let node = current_node.clone();

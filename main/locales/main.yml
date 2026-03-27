@@ -73,14 +73,10 @@ Home:
     en: No connections yet
     zh-CN: 暂无连接
     zh-HK: 暫無連線
-  no_connections_hint:
-    en: Click the button above to create a new connection
-    zh-CN: 点击上方按钮新建连接
-    zh-HK: 點擊上方按鈕新建連線
   welcome:
-    en: Welcome to Pig
-    zh-CN: 欢迎使用 Pig
-    zh-HK: 歡迎使用 Pig
+    en: Welcome to pig
+    zh-CN: 欢迎使用 pig
+    zh-HK: 歡迎使用 pig
   welcome_hint:
     en: Select a connection from the sidebar to view details
     zh-CN: 从侧边栏选择一个连接查看详情

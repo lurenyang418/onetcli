@@ -24,20 +24,20 @@ jobs:
         include:
           - target: aarch64-apple-darwin
             os: macos-latest
-            binary: onetcli
-            archive: onetcli-aarch64-apple-darwin.tar.gz
+            binary: pig
+            archive: pig-aarch64-apple-darwin.tar.gz
           - target: x86_64-apple-darwin
             os: macos-15-intel
-            binary: onetcli
-            archive: onetcli-x86_64-apple-darwin.tar.gz
+            binary: pig
+            archive: pig-x86_64-apple-darwin.tar.gz
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            binary: onetcli
-            archive: onetcli-x86_64-unknown-linux-gnu.tar.gz
+            binary: pig
+            archive: pig-x86_64-unknown-linux-gnu.tar.gz
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            binary: onetcli.exe
-            archive: onetcli-x86_64-pc-windows-msvc.zip
+            binary: pig.exe
+            archive: pig-x86_64-pc-windows-msvc.zip
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -81,18 +81,18 @@ jobs:
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             VERSION="${{ github.ref_name }}"
             VERSION="${VERSION#v}"
-            echo "ONETCLI_VERSION=${VERSION}" >> "$GITHUB_ENV"
+            echo "PIG_VERSION=${VERSION}" >> "$GITHUB_ENV"
           else
-            echo "ONETCLI_VERSION=0.0.0-dev.$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+            echo "PIG_VERSION=0.0.0-dev.$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
           fi
 
       - name: Build release binary
         env:
-          ONETCLI_UPDATE_URL: ${{ secrets.ONETCLI_UPDATE_URL }}
-          ONETCLI_UPDATE_DOWNLOAD_URL: ${{ secrets.ONETCLI_UPDATE_DOWNLOAD_URL }}
-          ONETCLI_WECHAT_QR_URL: ${{ secrets.ONETCLI_WECHAT_QR_URL }}
-          ONETCLI_ALIPAY_QR_URL: ${{ secrets.ONETCLI_ALIPAY_QR_URL }}
-          ONETCLI_PAYPAL_QR_URL: ${{ secrets.ONETCLI_PAYPAL_QR_URL }}
+          PIG_UPDATE_URL: ${{ secrets.PIG_UPDATE_URL }}
+          PIG_UPDATE_DOWNLOAD_URL: ${{ secrets.PIG_UPDATE_DOWNLOAD_URL }}
+          PIG_WECHAT_QR_URL: ${{ secrets.PIG_WECHAT_QR_URL }}
+          PIG_ALIPAY_QR_URL: ${{ secrets.PIG_ALIPAY_QR_URL }}
+          PIG_PAYPAL_QR_URL: ${{ secrets.PIG_PAYPAL_QR_URL }}
         run: cargo build --release -p main --target ${{ matrix.target }}
 
       - name: Create macOS app bundle
@@ -102,7 +102,7 @@ jobs:
           chmod +x script/bundle-macos-dmg.sh
           script/bundle-macos.sh ${{ matrix.target }}
           script/bundle-macos-dmg.sh ${{ matrix.target }}
-          tar czf ${{ matrix.archive }} -C target OnetCli.app
+          tar czf ${{ matrix.archive }} -C target .app
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
@@ -113,10 +113,10 @@ jobs:
           mkdir -p package/usr/share/icons/hicolor/256x256/apps
           mkdir -p package/usr/share/icons/hicolor/512x512/apps
           cp target/${{ matrix.target }}/release/${{ matrix.binary }} package/usr/bin/
-          cp resources/linux/onetcli.desktop package/usr/share/applications/
-          cp resources/linux/onetcli-128.png package/usr/share/icons/hicolor/128x128/apps/onetcli.png
-          cp resources/linux/onetcli-256.png package/usr/share/icons/hicolor/256x256/apps/onetcli.png
-          cp resources/linux/onetcli-512.png package/usr/share/icons/hicolor/512x512/apps/onetcli.png
+          cp resources/linux/pig.desktop package/usr/share/applications/
+          cp resources/linux/pig-128.png package/usr/share/icons/hicolor/128x128/apps/pig.png
+          cp resources/linux/pig-256.png package/usr/share/icons/hicolor/256x256/apps/pig.png
+          cp resources/linux/pig-512.png package/usr/share/icons/hicolor/512x512/apps/pig.png
           tar czf ${{ matrix.archive }} -C package .
 
       - name: Package (Windows)
@@ -135,8 +135,8 @@ jobs:
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: onetcli-${{ matrix.target }}.dmg
-          path: onetcli-${{ matrix.target }}.dmg
+          name: pig-${{ matrix.target }}.dmg
+          path: pig-${{ matrix.target }}.dmg
 
   release:
     name: Create Release
@@ -159,16 +159,16 @@ jobs:
       - name: Generate checksums
         run: |
           cd artifacts
-          sha256sum onetcli-* > sha256sums.txt
+          sha256sum pig-* > sha256sums.txt
           cat sha256sums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: OnetCli ${{ github.ref_name }}
+          name: pig ${{ github.ref_name }}
           generate_release_notes: true
           files: |
-            artifacts/onetcli-*.tar.gz
-            artifacts/onetcli-*.zip
-            artifacts/onetcli-*.dmg
+            artifacts/pig-*.tar.gz
+            artifacts/pig-*.zip
+            artifacts/pig-*.dmg
             artifacts/sha256sums.txt

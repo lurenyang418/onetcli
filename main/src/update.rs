@@ -88,7 +88,7 @@ pub fn schedule_update_check(window: &mut Window, cx: &mut App) {
 
     let config = UpdateConfig::get();
     if !config.is_valid() {
-        tracing::info!("更新检查未启用：缺少 ONETCLI_UPDATE_URL");
+        tracing::info!("更新检查未启用：缺少 PIG_UPDATE_URL");
         return;
     }
 

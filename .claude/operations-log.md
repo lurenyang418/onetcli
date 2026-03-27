@@ -1193,3 +1193,85 @@
 ### 本地验证
 - `cargo check -p main`
   - 结果：编译成功，仅有未使用导入和死代码警告（遗留自 Supabase 清理），与 MSSQL/Encourage 清理无关
+
+## Phase 3 完成 - MySQL 清理
+时间：2026-03-27
+
+### 本次完成的工作
+
+1. **streaming_parser.rs** - 删除 MySQL 特定解析逻辑：
+   - 行 228: 删除反斜杠转义检查
+   - 行 270: 删除 # 注释检查
+   - 行 297: 删除反引号字符串处理
+   - 行 322: 删除 MySQL 分隔符解析
+   - 行 397: 删除 MySQL # 注释处理
+   - 将所有测试从 MySQL 改为 PostgreSQL
+
+2. **db_connection_form.rs** - 将 mysql() 方法改为 postgres()，移除重复代码
+
+3. **database_objects_tab.rs** - 将 4 处 fallback 默认值从 MySQL 改为 PostgreSQL
+
+4. **db_tree_view.rs** - 将空连接占位符从 MySQL 改为 PostgreSQL，删除测试模块（仅测试 MySQL 特定功能）
+
+5. **sql_result_tab.rs** - 将 fallback 默认值从 MySQL 改为 PostgreSQL
+
+6. **table_data/data_grid.rs** - 删除 MySQL 标识符测试，仅保留 PostgreSQL 测试
+
+7. **sql_editor_view.rs** - 将 EXPLAIN SQL 测试从 MySQL 改为 PostgreSQL
+
+8. **table_designer_tab.rs** - 清理：
+   - build_plugin() 移除 SQLite 分支
+   - 移除 SQLite 相关的 auto_increment 检查
+   - 将测试改为仅测试 PostgreSQL
+
+### 本地验证
+- `cargo check -p main`
+  - 结果：编译成功，仅有未使用变量警告（与本次清理无关）
+
+## Phase 4 完成 - Redis 和 MongoDB 清理
+时间：2026-03-27
+
+### 本次完成的工作
+
+1. **models.rs** - 清理 ConnectionType 枚举：
+   - 移除 Redis 和 MongoDB 变体
+   - 更新 all()、from_str()、label()、icon() 方法
+
+2. **models.rs** - 删除 Redis 和 MongoDB 相关结构体：
+   - 删除 RedisMode 枚举
+   - 删除 RedisSentinelConfig 结构体
+   - 删除 RedisClusterConfig 结构体
+   - 删除 RedisParams 结构体
+   - 删除 MongoDBParams 结构体
+
+3. **models.rs** - 删除 StoredConnection 构造函数：
+   - 删除 new_redis() 方法
+   - 删除 new_mongodb() 方法
+
+### 本地验证
+- `cargo check -p one-core` - 通过
+- `cargo check -p main` - 通过
+
+## Phase 5 完成 - Serial 清理
+时间：2026-03-27
+
+### 本次完成的工作
+
+1. **models.rs** - 清理 ConnectionType 枚举：
+   - 移除 Serial 变体
+   - 更新 all()、from_str()、label()、icon() 方法
+
+2. **models.rs** - 删除 Serial 相关结构体：
+   - 删除 SerialParity 枚举
+   - 删除 SerialFlowControl 枚举
+   - 删除 SerialParams 结构体
+   - 删除辅助函数 default_baud_rate、default_data_bits、default_stop_bits
+
+3. **models.rs** - 删除 StoredConnection 方法：
+   - 删除 new_serial() 方法
+   - 删除 to_serial_params() 方法
+
+4. **models.rs** - 删除测试模块 serial_tests
+
+### 本地验证
+- `cargo check -p main` - 通过

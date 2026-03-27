@@ -2244,7 +2244,7 @@ mod tests {
             "node",
             DbNodeType::Table,
             "conn-id".to_string(),
-            DatabaseType::SQLite,
+            DatabaseType::PostgreSQL,
         )
         .with_children_loaded(true);
 
@@ -2258,7 +2258,7 @@ mod tests {
             "node",
             DbNodeType::Table,
             "conn-id".to_string(),
-            DatabaseType::SQLite,
+            DatabaseType::PostgreSQL,
         );
 
         assert!(!GlobalDbState::cached_children_ready(&node));

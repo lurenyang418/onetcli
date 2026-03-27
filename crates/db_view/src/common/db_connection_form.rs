@@ -6,8 +6,8 @@ use gpui::{
     ParentElement, PathPromptOptions, Render, SharedString, Styled, Window, div, prelude::*, px,
 };
 use gpui_component::{
-    ActiveTheme, IconName, IndexPath, Sizable, Size,
-    button::{Button, ButtonVariants as _},
+    ActiveTheme, IndexPath, Sizable, Size,
+    // button::{Button, ButtonVariants as _},
     form::{field, v_form},
     h_flex,
     input::{Input, InputEvent, InputState},
@@ -21,7 +21,7 @@ use one_core::gpui_tokio::Tokio;
 use one_core::storage::traits::Repository;
 use one_core::storage::{
     ConnectionRepository, DatabaseType, DbConnectionConfig, GlobalStorageState, StoredConnection,
-    Workspace, get_config_dir,
+    Workspace,
 };
 use rust_i18n::t;
 
@@ -315,82 +315,6 @@ impl DbFormConfig {
         ])
     }
 
-    /// MySQL form configuration
-    pub fn mysql() -> Self {
-        Self {
-            db_type: DatabaseType::MySQL,
-            title: format!("{} (MySQL)", t!("Common.new")),
-            tab_groups: vec![
-                TabGroup::new("general", t!("ConnectionForm.general")).fields(vec![
-                    FormField::new(
-                        "name",
-                        t!("ConnectionForm.connection_name"),
-                        FormFieldType::Text,
-                    )
-                    .placeholder("My MySQL Database")
-                    .default("Local MySQL"),
-                    FormField::new("host", t!("ConnectionForm.host"), FormFieldType::Text)
-                        .placeholder("localhost")
-                        .default("localhost"),
-                    FormField::new("port", t!("ConnectionForm.port"), FormFieldType::Number)
-                        .placeholder("3306")
-                        .default("3306"),
-                    FormField::new(
-                        "username",
-                        t!("ConnectionForm.username"),
-                        FormFieldType::Text,
-                    )
-                    .placeholder("root")
-                    .default("root"),
-                    FormField::new(
-                        "password",
-                        t!("ConnectionForm.password"),
-                        FormFieldType::Password,
-                    )
-                    .placeholder("Enter password"),
-                    FormField::new(
-                        "database",
-                        t!("ConnectionForm.database"),
-                        FormFieldType::Text,
-                    )
-                    .optional()
-                    .placeholder("database name (optional)")
-                    .default("ai_app"),
-                ]),
-                TabGroup::new("advanced", t!("ConnectionForm.advanced")).fields(vec![
-                    FormField::new(
-                        "connect_timeout",
-                        t!("ConnectionForm.connect_timeout"),
-                        FormFieldType::Number,
-                    )
-                    .optional()
-                    .placeholder("30")
-                    .default("30"),
-                    FormField::new(
-                        "read_timeout",
-                        t!("ConnectionForm.read_timeout"),
-                        FormFieldType::Number,
-                    )
-                    .optional()
-                    .placeholder("28800"),
-                ]),
-                TabGroup::new("ssl", t!("ConnectionForm.ssl")),
-                Self::ssh_tab_group(),
-                TabGroup::new("notes", t!("ConnectionForm.notes")).fields(vec![
-                    FormField::new(
-                        "remark",
-                        t!("ConnectionForm.remark"),
-                        FormFieldType::TextArea,
-                    )
-                    .rows(14)
-                    .optional()
-                    .placeholder(t!("ConnectionForm.enter_remark"))
-                    .default(""),
-                ]),
-            ],
-        }
-    }
-
     /// PostgreSQL form configuration
     pub fn postgres() -> Self {
         Self {
@@ -403,8 +327,8 @@ impl DbFormConfig {
                         t!("ConnectionForm.connection_name"),
                         FormFieldType::Text,
                     )
-                    .placeholder("My PostgreSQL Database")
-                    .default("Local PostgreSQL"),
+                    .placeholder("PostgreSQL Database")
+                    .default("Pig"),
                     FormField::new("host", t!("ConnectionForm.host"), FormFieldType::Text)
                         .placeholder("localhost")
                         .default("localhost"),
@@ -474,47 +398,6 @@ impl DbFormConfig {
                     .default(""),
                 ]),
                 Self::ssh_tab_group(),
-            ],
-        }
-    }
-
-    /// SQLite form configuration
-    pub fn sqlite() -> Self {
-        let default_db_path = get_config_dir()
-            .map(|p| p.join("pig_default.db").to_string_lossy().to_string())
-            .unwrap_or_else(|_| "pig_default.db".to_string());
-
-        Self {
-            db_type: DatabaseType::SQLite,
-            title: format!("{} (SQLite)", t!("Common.new")),
-            tab_groups: vec![
-                TabGroup::new("general", t!("ConnectionForm.general")).fields(vec![
-                    FormField::new(
-                        "name",
-                        t!("ConnectionForm.connection_name"),
-                        FormFieldType::Text,
-                    )
-                    .placeholder("My SQLite Database")
-                    .default("Local SQLite"),
-                    FormField::new(
-                        "host",
-                        t!("ConnectionForm.database_file_path"),
-                        FormFieldType::Text,
-                    )
-                    .placeholder("/path/to/database.db")
-                    .default(default_db_path),
-                ]),
-                TabGroup::new("notes", t!("ConnectionForm.notes")).fields(vec![
-                    FormField::new(
-                        "remark",
-                        t!("ConnectionForm.remark"),
-                        FormFieldType::TextArea,
-                    )
-                    .rows(14)
-                    .optional()
-                    .placeholder(t!("ConnectionForm.enter_remark"))
-                    .default(""),
-                ]),
             ],
         }
     }
@@ -739,17 +622,6 @@ impl DbConnectionForm {
             });
         } else {
             self.workspace_select.update(cx, |select, cx| {
-                select.set_selected_value(&None, window, cx);
-            });
-        }
-
-        // 加载团队归属
-        if let Some(ref team_id) = connection.team_id {
-            self.team_select.update(cx, |select, cx| {
-                select.set_selected_value(&Some(team_id.clone()), window, cx);
-            });
-        } else {
-            self.team_select.update(cx, |select, cx| {
                 select.set_selected_value(&None, window, cx);
             });
         }
@@ -1024,28 +896,17 @@ impl DbConnectionForm {
         let connection = self.build_connection(cx);
         let remark = self.get_field_value("remark", cx);
         let is_update = self.editing_connection.is_some();
-        let team_id = self
-            .team_select
-            .read(cx)
-            .selected_value()
-            .cloned()
-            .flatten();
 
         let mut stored = match &self.editing_connection {
             Some(conn) => {
                 let mut c = conn.clone();
                 c.name = connection.name.clone();
                 c.workspace_id = connection.workspace_id;
-                c.team_id = team_id;
                 c.params = serde_json::to_string(&connection)
                     .map_err(|e| format!("{}: {}", t!("ConnectionForm.serialize_failed"), e))?;
                 c
             }
-            None => {
-                let mut c = StoredConnection::from_db_connection(connection);
-                c.team_id = team_id;
-                c
-            }
+            None => StoredConnection::from_db_connection(connection)
         };
 
         stored.remark = remark;
@@ -1244,7 +1105,7 @@ impl Render for DbConnectionForm {
                     .overflow_y_scrollbar()
                     .when(!current_tab_fields.is_empty(), |this| {
                         let _is_general_tab = self.active_tab == 0;
-                        let db_type = self.config.db_type;
+                        // let db_type = self.config.db_type;
 
                         this.child(
                             v_form()
@@ -1256,8 +1117,6 @@ impl Render for DbConnectionForm {
                                 .children(current_tab_fields.iter().enumerate().map(
                                     |(i, field_info)| {
                                         let input_idx = field_input_offset + i;
-                                        let is_sqlite_path = db_type == DatabaseType::SQLite
-                                            && field_info.name == "host";
                                         let is_textarea =
                                             field_info.field_type == FormFieldType::TextArea;
                                         let is_select =
@@ -1304,20 +1163,6 @@ impl Render for DbConnectionForm {
                                                             el
                                                         }
                                                     })
-                                                    .when(is_sqlite_path, |el| {
-                                                        el.child(
-                                                            Button::new("browse-file")
-                                                                .icon(IconName::FolderOpen)
-                                                                .ghost()
-                                                                .on_click(cx.listener(
-                                                                    |this, _, window, cx| {
-                                                                        this.browse_file_path(
-                                                                            window, cx,
-                                                                        );
-                                                                    },
-                                                                )),
-                                                        )
-                                                    }),
                                             )
                                     },
                                 ))

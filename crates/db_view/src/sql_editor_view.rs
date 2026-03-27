@@ -3,9 +3,9 @@ use crate::sql_result_tab::SqlResultTabContainer;
 use db::{DbManager, GlobalDbState, SqlSource, StreamingSqlParser, format_sql};
 use gpui::prelude::*;
 use gpui::{
-    actions, App, AppContext, AsyncApp, Axis, Bounds, ClickEvent, Context, Element, Entity,
-    EventEmitter, FocusHandle, Focusable, IntoElement, MouseMoveEvent, MouseUpEvent,
-    ParentElement, Pixels, Point, Render, SharedString, Styled, Task, WeakEntity, Window, div, px,
+    App, AppContext, AsyncApp, Axis, Bounds, ClickEvent, Context, Element, Entity, EventEmitter,
+    FocusHandle, Focusable, IntoElement, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
+    Point, Render, SharedString, Styled, Task, WeakEntity, Window, actions, div, px,
 };
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{InputContextMenuItem, InputEvent};
@@ -29,12 +29,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 use tracing::error;
 
-actions!(
-    sql_editor,
-    [
-        RunSelection,
-    ]
-);
+actions!(sql_editor, [RunSelection,]);
 
 const SQL_EDITOR_CONTEXT: &str = "SqlEditor";
 
@@ -280,24 +275,27 @@ impl SqlEditorTab {
         cx: &mut Context<Self>,
     ) {
         let view = cx.entity().clone();
-        cx.subscribe(&editor, move |_, _, event: &crate::sql_editor::SqlEditorEvent, cx| {
-            if matches!(event, crate::sql_editor::SqlEditorEvent::RunWithSelection) {
-                let view_clone = view.clone();
-                cx.spawn(async move |_weak_entity, cx: &mut AsyncApp| {
-                    let _ = cx.update(|cx| {
-                        if let Some(window_id) = cx.active_window() {
-                            cx.update_window(window_id, move |_entity, window, cx| {
-                                view_clone.update(cx, |this, cx| {
-                                    this.handle_run_selected_query(window, cx);
-                                });
-                            })
-                            .ok();
-                        }
-                    });
-                })
-                .detach();
-            }
-        })
+        cx.subscribe(
+            &editor,
+            move |_, _, event: &crate::sql_editor::SqlEditorEvent, cx| {
+                if matches!(event, crate::sql_editor::SqlEditorEvent::RunWithSelection) {
+                    let view_clone = view.clone();
+                    cx.spawn(async move |_weak_entity, cx: &mut AsyncApp| {
+                        let _ = cx.update(|cx| {
+                            if let Some(window_id) = cx.active_window() {
+                                cx.update_window(window_id, move |_entity, window, cx| {
+                                    view_clone.update(cx, |this, cx| {
+                                        this.handle_run_selected_query(window, cx);
+                                    });
+                                })
+                                .ok();
+                            }
+                        });
+                    })
+                    .detach();
+                }
+            },
+        )
         .detach();
     }
 
@@ -701,16 +699,9 @@ impl SqlEditorTab {
         statements
     }
 
-    fn build_explain_statement(database_type: DatabaseType, sql: &str) -> String {
+    fn build_explain_statement(sql: &str) -> String {
         let sql = sql.trim();
-        match database_type {
-            DatabaseType::MySQL | DatabaseType::PostgreSQL => {
-                format!("EXPLAIN {sql}")
-            }
-            DatabaseType::SQLite => {
-                format!("EXPLAIN QUERY PLAN {sql}")
-            }
-        }
+        format!("EXPLAIN {sql}")
     }
 
     fn is_select_set_expr(expr: &SetExpr) -> bool {
@@ -749,7 +740,7 @@ impl SqlEditorTab {
         let explain_statements = statements
             .into_iter()
             .filter(|statement| Self::is_select_statement(database_type, statement))
-            .map(|statement| Self::build_explain_statement(database_type, &statement))
+            .map(|statement| Self::build_explain_statement(&statement))
             .collect::<Vec<_>>();
 
         if explain_statements.is_empty() {
@@ -1179,7 +1170,12 @@ impl Render for SqlEditorTab {
 }
 
 impl SqlEditorTab {
-    fn handle_run_selection(&mut self, _: &RunSelection, window: &mut Window, cx: &mut Context<Self>) {
+    fn handle_run_selection(
+        &mut self,
+        _: &RunSelection,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.handle_run_selected_query(window, cx);
     }
 }
@@ -1340,26 +1336,18 @@ mod tests {
     use one_core::storage::DatabaseType;
 
     #[test]
-    fn test_build_explain_sql_mysql() {
+    fn test_build_explain_sql_postgresql() {
         assert_eq!(
-            SqlEditorTab::build_explain_sql(DatabaseType::MySQL, " SELECT * FROM users "),
+            SqlEditorTab::build_explain_sql(DatabaseType::PostgreSQL, " SELECT * FROM users "),
             Some("EXPLAIN SELECT * FROM users".to_string())
         );
     }
 
     #[test]
-    fn test_build_explain_sql_sqlite() {
-        assert_eq!(
-            SqlEditorTab::build_explain_sql(DatabaseType::SQLite, "select * from users"),
-            Some("EXPLAIN QUERY PLAN select * from users".to_string())
-        );
-    }
-
-    #[test]
-    fn test_build_explain_sql_mysql_multiple_statements() {
+    fn test_build_explain_sql_postgresql_multiple_statements() {
         assert_eq!(
             SqlEditorTab::build_explain_sql(
-                DatabaseType::MySQL,
+                DatabaseType::PostgreSQL,
                 "select * from users; select * from posts;"
             ),
             Some("EXPLAIN select * from users;\nEXPLAIN select * from posts".to_string())
@@ -1367,10 +1355,10 @@ mod tests {
     }
 
     #[test]
-    fn test_build_explain_sql_mysql_preserves_semicolon_in_string() {
+    fn test_build_explain_sql_postgresql_preserves_semicolon_in_string() {
         assert_eq!(
             SqlEditorTab::build_explain_sql(
-                DatabaseType::MySQL,
+                DatabaseType::PostgreSQL,
                 "select ';' as semi; select 2 as id;"
             ),
             Some("EXPLAIN select ';' as semi;\nEXPLAIN select 2 as id".to_string())
@@ -1381,7 +1369,7 @@ mod tests {
     fn test_build_explain_sql_skips_non_select_statements() {
         assert_eq!(
             SqlEditorTab::build_explain_sql(
-                DatabaseType::MySQL,
+                DatabaseType::PostgreSQL,
                 "insert into users values (1); select * from users; update users set id = 2;"
             ),
             Some("EXPLAIN select * from users".to_string())
@@ -1392,7 +1380,7 @@ mod tests {
     fn test_build_explain_sql_returns_none_for_non_select_only() {
         assert_eq!(
             SqlEditorTab::build_explain_sql(
-                DatabaseType::MySQL,
+                DatabaseType::PostgreSQL,
                 "insert into users values (1); update users set id = 2;"
             ),
             None

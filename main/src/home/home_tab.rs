@@ -43,6 +43,17 @@ pub fn init(cx: &mut App) {
     ]);
 }
 
+fn get_new_connection_label() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        format!("{} (⌘N)", t!("Home.new_connection"))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        format!("{} (Ctrl+N)", t!("Home.new_connection"))
+    }
+}
+
 // HomePage Entity - 管理 home 页面的所有状态
 
 pub struct HomePage {
@@ -356,7 +367,7 @@ impl HomePage {
             } else {
                 t!("Connection.new", db_type = db_type.as_str()).to_string()
             })
-            .size(700.0, 650.0),
+            .size(700.0, 700.0),
             move |window, cx| cx.new(|cx| ConnectionFormWindow::new(config, window, cx)),
             cx,
         );
@@ -493,15 +504,9 @@ impl HomePage {
                     .child(t!("Home.no_connections")),
             )
             .child(
-                div()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(t!("Home.no_connections_hint")),
-            )
-            .child(
                 Button::new("create_first_connection")
                     .icon(IconName::Plus)
-                    .label(t!("Home.new_connection"))
+                    .label(get_new_connection_label())
                     .bg(cx.theme().primary)
                     .text_color(cx.theme().primary_foreground)
                     .on_click(move |_, window, cx| {
@@ -536,12 +541,6 @@ impl HomePage {
                     .text_color(cx.theme().muted_foreground)
                     .child(t!("Home.welcome_hint")),
             )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(t!("Home.new_connection_shortcut")),
-            )
     }
 
     fn render_connection_detail(
@@ -553,7 +552,7 @@ impl HomePage {
         if let Ok(params) = conn.to_db_connection() {
             let dsn_display = format!(
                 "{}://{}:****@{}:{}{}",
-                params.database_type.as_str(),
+                "pgsql",
                 params.username,
                 params.host,
                 params.port,
@@ -561,7 +560,7 @@ impl HomePage {
             );
             let dsn_real = format!(
                 "{}://{}:{}@{}:{}{}",
-                params.database_type.as_str(),
+                "pgsql",
                 params.username,
                 params.password,
                 params.host,
@@ -1086,19 +1085,14 @@ impl HomePage {
                             })
                             .when(conn.connection_type == ConnectionType::Database, |this| {
                                 if let Ok(params) = conn.to_db_connection() {
-                                    let conn_info = if params.database_type == DatabaseType::SQLite
-                                    {
-                                        params.host.clone()
-                                    } else {
-                                        let database = match params.database {
-                                            Some(database) => format!("/{}", database),
-                                            None => "".to_string(),
-                                        };
-                                        format!(
-                                            "{}@{}:{}{}",
-                                            params.username, params.host, params.port, database
-                                        )
+                                    let database = match params.database {
+                                        Some(database) => format!("/{}", database),
+                                        None => "".to_string(),
                                     };
+                                    let conn_info = format!(
+                                        "{}@{}:{}{}",
+                                        params.username, params.host, params.port, database
+                                    );
                                     let tooltip_text: SharedString = conn_info.clone().into();
                                     this.child(
                                         div()

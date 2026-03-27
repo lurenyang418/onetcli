@@ -1,16 +1,15 @@
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, Context, Entity, FocusHandle, Focusable, IntoElement, ParentElement, Render, SharedString,
-    Styled, Window, div,
+    div, App, Context, Entity, FocusHandle, Focusable, IntoElement, ParentElement, Render,
+    SharedString, Styled, Window,
 };
 use gpui_component::{
-    ActiveTheme, Disableable, Sizable, TitleBar,
     button::{Button, ButtonVariants as _},
     h_flex,
     scroll::ScrollableElement,
-    v_flex,
+    v_flex, ActiveTheme, Disableable, Sizable,
 };
-use one_core::connection_notifier::{ConnectionDataEvent, emit_connection_event};
+use one_core::connection_notifier::{emit_connection_event, ConnectionDataEvent};
 use one_core::storage::{DatabaseType, StoredConnection};
 use rust_i18n::t;
 
@@ -25,11 +24,10 @@ pub struct ConnectionFormWindowConfig {
 
 /// 连接表单窗口
 ///
-/// 包含 TitleBar、DbConnectionForm 和操作按钮
+/// 包含 DbConnectionForm 和操作按钮
 pub struct ConnectionFormWindow {
     focus_handle: FocusHandle,
     form: Entity<DbConnectionForm>,
-    title: SharedString,
 }
 
 impl ConnectionFormWindow {
@@ -92,7 +90,6 @@ impl ConnectionFormWindow {
         Self {
             focus_handle: cx.focus_handle(),
             form,
-            title,
         }
     }
 
@@ -130,18 +127,6 @@ impl Render for ConnectionFormWindow {
         v_flex()
             .size_full()
             .bg(cx.theme().background)
-            .child(
-                TitleBar::new().child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .flex_1()
-                        .text_sm()
-                        .font_weight(gpui::FontWeight::MEDIUM)
-                        .child(self.title.clone()),
-                ),
-            )
             .child(
                 div()
                     .flex_1()

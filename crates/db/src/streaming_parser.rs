@@ -225,12 +225,12 @@ impl StreamingSqlParser {
                 return None;
             }
 
-            if ch == '\\' && self.db_type == DatabaseType::MySQL {
-                self.buffer.push(ch);
-                self.escape_next = true;
-                self.prev_was_string_char = false;
-                return None;
-            }
+            // if ch == '\\' && self.db_type == DatabaseType::MySQL {
+            //     self.buffer.push(ch);
+            //     self.escape_next = true;
+            //     self.prev_was_string_char = false;
+            //     return None;
+            // }
 
             if ch == self.string_char {
                 self.buffer.push(ch);
@@ -267,11 +267,11 @@ impl StreamingSqlParser {
             return None;
         }
 
-        if ch == '#' && self.db_type == DatabaseType::MySQL {
-            self.buffer.push(ch);
-            self.in_line_comment = true;
-            return None;
-        }
+        // if ch == '#' && self.db_type == DatabaseType::MySQL {
+        //     self.buffer.push(ch);
+        //     self.in_line_comment = true;
+        //     return None;
+        // }
 
         if ch == '*' && self.buffer.ends_with('/') {
             self.buffer.push(ch);
@@ -294,13 +294,6 @@ impl StreamingSqlParser {
             return None;
         }
 
-        if ch == '`' && self.db_type == DatabaseType::MySQL {
-            self.in_string = true;
-            self.string_char = ch;
-            self.buffer.push(ch);
-            return None;
-        }
-
         if ch == '(' {
             self.paren_depth += 1;
             self.buffer.push(ch);
@@ -317,21 +310,6 @@ impl StreamingSqlParser {
 
         if ch.is_whitespace() || ch == ';' || ch == '$' {
             self.update_begin_depth();
-        }
-
-        if self.db_type == DatabaseType::MySQL && ch == '\n' {
-            if let Some(new_delim) = self.try_parse_delimiter() {
-                self.delimiter = new_delim;
-                let lines: Vec<&str> = self.buffer.lines().collect();
-                if lines.len() > 1 {
-                    self.buffer = lines[..lines.len() - 1].join("\n");
-                    self.last_checked_len = 0;
-                } else {
-                    self.buffer.clear();
-                    self.last_checked_len = 0;
-                }
-                return None;
-            }
         }
 
         if self.paren_depth == 0 && self.begin_depth == 0 {
@@ -377,19 +355,19 @@ impl StreamingSqlParser {
         }
     }
 
-    fn try_parse_delimiter(&self) -> Option<String> {
-        let lines: Vec<&str> = self.buffer.lines().collect();
-        if let Some(last_line) = lines.last() {
-            let trimmed = last_line.trim();
-            if trimmed.to_uppercase().starts_with("DELIMITER") {
-                let parts: Vec<&str> = trimmed.split_whitespace().collect();
-                if parts.len() >= 2 {
-                    return Some(parts[1].to_string());
-                }
-            }
-        }
-        None
-    }
+    // fn try_parse_delimiter(&self) -> Option<String> {
+    //     let lines: Vec<&str> = self.buffer.lines().collect();
+    //     if let Some(last_line) = lines.last() {
+    //         let trimmed = last_line.trim();
+    //         if trimmed.to_uppercase().starts_with("DELIMITER") {
+    //             let parts: Vec<&str> = trimmed.split_whitespace().collect();
+    //             if parts.len() >= 2 {
+    //                 return Some(parts[1].to_string());
+    //             }
+    //         }
+    //     }
+    //     None
+    // }
 
     /// 检查字符串是否为纯注释（只包含注释和空白字符）
     fn is_pure_comment(&self, s: &str) -> bool {
@@ -412,16 +390,6 @@ impl StreamingSqlParser {
                         }
                     } else {
                         return false;
-                    }
-                }
-
-                // MySQL 的 # 注释
-                '#' if self.db_type == DatabaseType::MySQL => {
-                    // 跳过直到换行
-                    for c in chars.by_ref() {
-                        if c == '\n' {
-                            break;
-                        }
                     }
                 }
 
@@ -526,7 +494,7 @@ mod test {
     #[test]
     fn test_basic_statements() {
         let sql = "SELECT * FROM users;\nINSERT INTO users VALUES (1, 'test');\nUPDATE users SET name = 'new';";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 3);
         assert_eq!(statements[0], "SELECT * FROM users");
@@ -538,7 +506,7 @@ mod test {
     fn test_string_with_backslash_escape() {
         let sql =
             "INSERT INTO t VALUES ('it\\'s good');\nINSERT INTO t VALUES ('path\\\\to\\\\file');";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert_eq!(statements[0], "INSERT INTO t VALUES ('it\\'s good')");
@@ -549,7 +517,7 @@ mod test {
     fn test_string_with_double_quote_escape() {
         let sql =
             "INSERT INTO t VALUES ('it''s good');\nINSERT INTO t VALUES ('quote''test''here');";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert_eq!(statements[0], "INSERT INTO t VALUES ('it''s good')");
@@ -559,7 +527,7 @@ mod test {
     #[test]
     fn test_mixed_escapes() {
         let sql = "INSERT INTO t VALUES ('test\\'s', 'he''s', 'path\\\\x');\nSELECT * FROM t;";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("'test\\'s'"));
@@ -570,7 +538,7 @@ mod test {
     #[test]
     fn test_line_comments() {
         let sql = "-- This is a comment\nSELECT * FROM users; -- inline comment\n-- Another comment\nINSERT INTO t VALUES (1);";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("SELECT * FROM users"));
@@ -578,17 +546,9 @@ mod test {
     }
 
     #[test]
-    fn test_mysql_hash_comments() {
-        let sql = "# MySQL comment\nSELECT * FROM users; # inline\nINSERT INTO t VALUES (1);";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
-
-        assert_eq!(statements.len(), 2);
-    }
-
-    #[test]
     fn test_block_comments() {
         let sql = "/* This is a block comment */\nSELECT * FROM users; /* inline */ DELETE FROM t;";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("SELECT"));
@@ -599,7 +559,7 @@ mod test {
     fn test_delimiter_change() {
         let sql =
             "DELIMITER $$\nCREATE PROCEDURE p() BEGIN SELECT 1; END$$\nDELIMITER ;\nSELECT 2;";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("CREATE PROCEDURE"));
@@ -611,7 +571,7 @@ mod test {
     #[test]
     fn test_begin_end_block() {
         let sql = "BEGIN\n  SELECT 1;\n  SELECT 2;\nEND;\nSELECT 3;";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("BEGIN"));
@@ -622,7 +582,7 @@ mod test {
     #[test]
     fn test_nested_parentheses() {
         let sql = "SELECT * FROM t WHERE id IN (SELECT id FROM u WHERE (status = 1 AND (flag = 0)));\nINSERT INTO t VALUES (1);";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("IN (SELECT"));
@@ -653,7 +613,7 @@ mod test {
     #[test]
     fn test_unicode_content() {
         let sql = "INSERT INTO t VALUES ('中文测试');\nINSERT INTO t VALUES ('日本語');\nINSERT INTO t VALUES ('한글');";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 3);
         assert!(statements[0].contains("中文测试"));
@@ -664,7 +624,7 @@ mod test {
     #[test]
     fn test_unicode_with_escapes() {
         let sql = "INSERT INTO t VALUES ('测试\\'引号');\nINSERT INTO t VALUES ('test''测试');";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("测试\\'引号"));
@@ -674,7 +634,7 @@ mod test {
     #[test]
     fn test_multiline_statement() {
         let sql = "INSERT INTO users (\n  id,\n  name,\n  email\n)\nVALUES (\n  1,\n  'test',\n  'test@example.com'\n);\nSELECT 1;";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("INSERT INTO users"));
@@ -684,7 +644,7 @@ mod test {
     #[test]
     fn test_empty_statements() {
         let sql = ";;;\nSELECT 1;\n;\n;;SELECT 2;";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert_eq!(statements[0], "SELECT 1");
@@ -708,7 +668,7 @@ LOCK TABLES `users` WRITE;
 INSERT INTO `users` VALUES (1,'O\'Reilly','test@mail.com'),(2,'It''s fine','user@test.com');
 UNLOCK TABLES;
 "#;
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert!(statements.len() >= 5);
         assert!(statements.iter().any(|s| s.contains("DROP TABLE")));
@@ -720,7 +680,7 @@ UNLOCK TABLES;
     #[test]
     fn test_string_with_semicolon_inside() {
         let sql = "INSERT INTO t VALUES ('SELECT * FROM users; DELETE FROM t;');\nSELECT 1;";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("SELECT * FROM users; DELETE FROM t;"));
@@ -730,7 +690,7 @@ UNLOCK TABLES;
     #[test]
     fn test_backtick_identifiers() {
         let sql = "SELECT `id`, `name` FROM `users`;\nINSERT INTO `table` VALUES (1, 'test;here');";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("`id`"));
@@ -749,7 +709,7 @@ UNLOCK TABLES;
     #[test]
     fn test_mixed_quotes() {
         let sql = r#"SELECT 'single', "double", `backtick` FROM t WHERE x = 'it''s' AND y = "col""name";"#;
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 1);
         assert!(statements[0].contains("'single'"));
@@ -761,7 +721,7 @@ UNLOCK TABLES;
         let sql = "SELECT 1;\nSELECT 2;\nSELECT 3;";
         let mut parser = StreamingSqlParser::from_source(
             SqlSource::Script(sql.to_string()),
-            DatabaseType::MySQL,
+            DatabaseType::PostgreSQL,
         )
         .unwrap();
 
@@ -779,7 +739,7 @@ UNLOCK TABLES;
     fn test_pure_comment_after_statement() {
         // 测试语句后跟纯注释的情况，纯注释不应该被当作独立语句
         let sql = "SELECT id, username, create_by FROM login_user; -- ❌ 列不存在";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 1);
         assert_eq!(
@@ -792,7 +752,7 @@ UNLOCK TABLES;
     fn test_pure_comment_only() {
         // 测试只有纯注释的情况
         let sql = "-- 这是一个注释";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 0);
     }
@@ -801,7 +761,7 @@ UNLOCK TABLES;
     fn test_multiple_pure_comments() {
         // 测试多个纯注释
         let sql = "-- 注释1\n-- 注释2\n/* 块注释 */";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 0);
     }
@@ -810,7 +770,7 @@ UNLOCK TABLES;
     fn test_mixed_comments_and_statements() {
         // 测试混合场景
         let sql = "SELECT 1; -- 注释\n-- 纯注释\nSELECT 2; /* 行尾注释 */";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("SELECT 1"));
@@ -820,7 +780,7 @@ UNLOCK TABLES;
     #[test]
     fn test_nested_begin_end() {
         let sql = "BEGIN\n  BEGIN\n    SELECT 1;\n  END;\n  SELECT 2;\nEND;\nSELECT 3;";
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("BEGIN"));
@@ -845,7 +805,7 @@ BEGIN
 END$$
 DELIMITER ;
 SELECT 'done';"#;
-        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::MySQL);
+        let statements = parse_all(SqlSource::Script(sql.to_string()), DatabaseType::PostgreSQL);
 
         assert_eq!(statements.len(), 2);
         assert!(statements[0].contains("CREATE PROCEDURE"));

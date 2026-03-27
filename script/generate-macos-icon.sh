@@ -3,27 +3,27 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SOURCE_SVG="${1:-${PROJECT_DIR}/logo.svg}"
-OUTPUT_ICNS="${2:-${PROJECT_DIR}/resources/macos/OnetCli.icns}"
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/onetcli-icon.XXXXXX")"
-ICONSET_DIR="${WORK_DIR}/OnetCli.iconset"
-MASTER_PNG="${WORK_DIR}/OnetCli-master.png"
+SOURCE_PNG="${1:-${PROJECT_DIR}/logo.png}"
+OUTPUT_ICNS="${2:-${PROJECT_DIR}/resources/macos/pig.icns}"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/pig-icon.XXXXXX")"
+ICONSET_DIR="${WORK_DIR}/pig.iconset"
+MASTER_PNG="${WORK_DIR}/pig-master.png"
 
 cleanup() {
     rm -rf "$WORK_DIR"
 }
 trap cleanup EXIT
 
-if [ ! -f "$SOURCE_SVG" ]; then
-    echo "Error: SVG source not found at ${SOURCE_SVG}"
+if [ ! -f "$SOURCE_PNG" ]; then
+    echo "Error: SVG source not found at ${SOURCE_PNG}"
     exit 1
 fi
 
 mkdir -p "$ICONSET_DIR"
 mkdir -p "$(dirname "$OUTPUT_ICNS")"
 
-echo "Rendering macOS icon from ${SOURCE_SVG}..."
-sips -s format png "$SOURCE_SVG" --out "$MASTER_PNG" >/dev/null
+echo "Rendering macOS icon from ${SOURCE_PNG}..."
+sips -s format png "$SOURCE_PNG" --out "$MASTER_PNG" >/dev/null
 
 render_icon() {
     local size="$1"

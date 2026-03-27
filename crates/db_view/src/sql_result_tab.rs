@@ -287,7 +287,7 @@ impl SqlResultTabContainer {
                 let config = global_state.get_config(&connection_id);
                 let database_type = config
                     .map(|c| c.database_type)
-                    .unwrap_or(one_core::storage::DatabaseType::MySQL);
+                    .unwrap_or(one_core::storage::DatabaseType::PostgreSQL);
                 (global_state.clone(), database_type)
             });
 

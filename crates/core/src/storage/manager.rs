@@ -79,7 +79,7 @@ impl Clone for StorageManager {
 
 pub fn get_db_path() -> Result<PathBuf> {
     let config_dir = get_config_dir()?;
-    Ok(config_dir.join("one-hub.db"))
+    Ok(config_dir.join("pig.db"))
 }
 
 pub fn get_config_dir() -> Result<PathBuf> {
@@ -87,16 +87,16 @@ pub fn get_config_dir() -> Result<PathBuf> {
         dirs::home_dir()
             .ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?
             .join(".config")
-            .join("one-hub")
+            .join("pig")
     } else if cfg!(target_os = "windows") {
         dirs::config_dir()
             .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?
-            .join("one-hub")
+            .join("pig")
     } else {
         dirs::home_dir()
             .ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?
             .join(".config")
-            .join("one-hub")
+            .join("pig")
     };
 
     Ok(config_dir)

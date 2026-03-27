@@ -1,13 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-APP_NAME="OnetCli"
+APP_NAME="pig"
 TARGET="${1:-aarch64-apple-darwin}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="${PROJECT_DIR}/target/${APP_NAME}.app"
 TMP_DIR="${PROJECT_DIR}/target/dmg"
-DMG_NAME="onetcli-${TARGET}.dmg"
+DMG_NAME="${APP_NAME}-${TARGET}.dmg"
 DMG_PATH="${PROJECT_DIR}/${DMG_NAME}"
 
 if [ ! -d "$APP_DIR" ]; then

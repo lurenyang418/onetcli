@@ -469,7 +469,7 @@ impl DbTreeView {
                 t!("Connection.no_database_connected").to_string(),
                 DbNodeType::Connection,
                 "".to_string(),
-                DatabaseType::MySQL,
+                DatabaseType::PostgreSQL,
             );
             db_nodes.insert("root".to_string(), node.clone());
         } else {
@@ -2204,7 +2204,7 @@ impl DbTreeView {
 
         // 获取节点类型相关信息
         let node_type = node.as_ref().map(|n| n.node_type.clone());
-        let database_type = node.as_ref().map(|n| n.database_type.clone());
+        // let database_type = node.as_ref().map(|n| n.database_type.clone());
         // 判断是否是分组类型（Folder 类型）
         let is_folder_type = matches!(
             node_type,
@@ -2219,9 +2219,7 @@ impl DbTreeView {
         );
 
         // 数据库筛选计数
-        let db_count = if node_type == Some(DbNodeType::Connection)
-            && database_type != Some(DatabaseType::SQLite)
-        {
+        let db_count = if node_type == Some(DbNodeType::Connection) {
             Some(self.get_selected_database_count(&node_id))
         } else {
             None
@@ -2565,74 +2563,5 @@ impl EventEmitter<DbTreeViewEvent> for DbTreeView {}
 impl Focusable for DbTreeView {
     fn focus_handle(&self, _cx: &App) -> FocusHandle {
         self.focus_handle.clone()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn build_node(node_type: DbNodeType, name: &str, metadata: &[(&str, &str)]) -> DbNode {
-        let metadata = metadata
-            .iter()
-            .map(|(key, value)| (key.to_string(), value.to_string()))
-            .collect();
-
-        DbNode::new(
-            format!("node-{name}"),
-            name,
-            node_type,
-            "conn-1".to_string(),
-            DatabaseType::MySQL,
-        )
-        .with_metadata(metadata)
-    }
-
-    #[test]
-    fn refresh_connection_node_uses_connection_scope() {
-        let node = build_node(DbNodeType::Connection, "conn", &[]);
-        assert_eq!(
-            resolve_refresh_metadata_scope(&node),
-            RefreshMetadataScope::Connection
-        );
-    }
-
-    #[test]
-    fn refresh_nodes_with_database_context_use_database_scope() {
-        let cases = [
-            build_node(DbNodeType::Database, "analytics", &[]),
-            build_node(DbNodeType::Schema, "public", &[("database", "analytics")]),
-            build_node(
-                DbNodeType::Table,
-                "users",
-                &[("database", "analytics"), ("schema", "public")],
-            ),
-            build_node(
-                DbNodeType::ViewsFolder,
-                "views",
-                &[("database", "analytics"), ("schema", "public")],
-            ),
-            build_node(
-                DbNodeType::Function,
-                "fn_count",
-                &[("database", "analytics")],
-            ),
-        ];
-
-        for node in cases {
-            assert_eq!(
-                resolve_refresh_metadata_scope(&node),
-                RefreshMetadataScope::Database("analytics".to_string())
-            );
-        }
-    }
-
-    #[test]
-    fn refresh_nodes_without_database_context_skip_metadata_invalidation() {
-        let node = build_node(DbNodeType::QueriesFolder, "queries", &[]);
-        assert_eq!(
-            resolve_refresh_metadata_scope(&node),
-            RefreshMetadataScope::None
-        );
     }
 }

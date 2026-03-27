@@ -43,10 +43,7 @@ pub enum ConnectionType {
     All,
     Database,
     SshSftp,
-    Redis,
-    MongoDB,
     ChatDB,
-    Serial,
 }
 
 impl fmt::Display for ConnectionType {
@@ -55,10 +52,7 @@ impl fmt::Display for ConnectionType {
             ConnectionType::All => "All",
             ConnectionType::Database => "Database",
             ConnectionType::SshSftp => "SshSftp",
-            ConnectionType::Redis => "Redis",
-            ConnectionType::MongoDB => "MongoDB",
             ConnectionType::ChatDB => "ChatDB",
-            ConnectionType::Serial => "Serial",
         };
         write!(f, "{}", s)
     }
@@ -70,20 +64,14 @@ impl ConnectionType {
             ConnectionType::All,
             ConnectionType::Database,
             ConnectionType::SshSftp,
-            ConnectionType::Redis,
-            ConnectionType::MongoDB,
             ConnectionType::ChatDB,
-            ConnectionType::Serial,
         ]
     }
     pub fn from_str(s: &str) -> Self {
         match s {
             "Database" => ConnectionType::Database,
             "SshSftp" => ConnectionType::SshSftp,
-            "Redis" => ConnectionType::Redis,
-            "MongoDB" => ConnectionType::MongoDB,
             "ChatDB" => ConnectionType::ChatDB,
-            "Serial" => ConnectionType::Serial,
             _ => ConnectionType::Database,
         }
     }
@@ -93,10 +81,7 @@ impl ConnectionType {
             ConnectionType::All => "全部",
             ConnectionType::Database => "数据库",
             ConnectionType::SshSftp => "SSH/SFTP",
-            ConnectionType::Redis => "Redis",
-            ConnectionType::MongoDB => "MongoDB",
             ConnectionType::ChatDB => "ChatDB",
-            ConnectionType::Serial => "串口",
         }
     }
 
@@ -105,10 +90,7 @@ impl ConnectionType {
             ConnectionType::All => IconName::Server,
             ConnectionType::Database => IconName::Database,
             ConnectionType::SshSftp => IconName::TerminalColor,
-            ConnectionType::Redis => IconName::Redis,
-            ConnectionType::MongoDB => IconName::MongoDB,
             ConnectionType::ChatDB => IconName::AI,
-            ConnectionType::Serial => IconName::SerialPort,
         }
     }
 }
@@ -116,49 +98,35 @@ impl ConnectionType {
 /// Database type enumeration
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DatabaseType {
-    MySQL,
     PostgreSQL,
-    SQLite,
 }
 
 impl DatabaseType {
     pub fn all() -> &'static [DatabaseType] {
-        &[
-            DatabaseType::MySQL,
-            DatabaseType::PostgreSQL,
-            DatabaseType::SQLite,
-        ]
+        &[DatabaseType::PostgreSQL]
     }
 
     pub fn as_str(&self) -> &str {
         match self {
-            DatabaseType::MySQL => "MySQL",
             DatabaseType::PostgreSQL => "PostgreSQL",
-            DatabaseType::SQLite => "SQLite",
         }
     }
 
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
-            "MySQL" => Some(DatabaseType::MySQL),
             "PostgreSQL" => Some(DatabaseType::PostgreSQL),
-            "SQLite" => Some(DatabaseType::SQLite),
             _ => None,
         }
     }
 
     pub fn as_icon(&self) -> Icon {
         match self {
-            DatabaseType::MySQL => IconName::MySQLColor.color().with_size(Large),
             DatabaseType::PostgreSQL => IconName::PostgreSQLColor.color().with_size(Large),
-            DatabaseType::SQLite => IconName::SQLiteColor.color().with_size(Large),
         }
     }
     pub fn as_node_icon(&self) -> Icon {
         match self {
-            DatabaseType::MySQL => IconName::MySQLLineColor.color().with_size(Large),
             DatabaseType::PostgreSQL => IconName::PostgreSQLLineColor.color().with_size(Large),
-            DatabaseType::SQLite => IconName::SQLiteLineColor.color().with_size(Large),
         }
     }
 }
@@ -231,189 +199,6 @@ pub enum SshAuthMethod {
     },
 }
 
-/// Redis 连接模式
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RedisMode {
-    /// 单机模式
-    #[default]
-    Standalone,
-    /// 哨兵模式
-    Sentinel,
-    /// 集群模式
-    Cluster,
-}
-
-/// Redis 哨兵配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RedisSentinelConfig {
-    /// 主节点名称
-    pub master_name: String,
-    /// 哨兵节点列表（host:port）
-    pub sentinels: Vec<String>,
-    /// 哨兵密码
-    pub sentinel_password: Option<String>,
-}
-
-/// Redis 集群节点
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RedisClusterConfig {
-    /// 集群节点列表（host:port）
-    pub nodes: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RedisParams {
-    pub host: String,
-    pub port: u16,
-    pub password: Option<String>,
-    pub username: Option<String>,
-    pub db_index: u8,
-    /// 连接模式
-    #[serde(default)]
-    pub mode: RedisMode,
-    /// 是否启用 TLS
-    #[serde(default)]
-    pub use_tls: bool,
-    /// 连接超时（秒）
-    #[serde(default)]
-    pub connect_timeout: Option<u64>,
-    /// 哨兵配置
-    #[serde(default)]
-    pub sentinel: Option<RedisSentinelConfig>,
-    /// 集群配置
-    #[serde(default)]
-    pub cluster: Option<RedisClusterConfig>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MongoDBParams {
-    #[serde(default)]
-    pub connection_string: String,
-    #[serde(default)]
-    pub host: String,
-    #[serde(default)]
-    pub port: Option<u16>,
-    #[serde(default)]
-    pub database: Option<String>,
-    #[serde(default)]
-    pub username: Option<String>,
-    #[serde(default)]
-    pub password: Option<String>,
-    #[serde(default)]
-    pub auth_source: Option<String>,
-    #[serde(default)]
-    pub replica_set: Option<String>,
-    #[serde(default)]
-    pub read_preference: Option<String>,
-    #[serde(default)]
-    pub use_srv_record: bool,
-    #[serde(default)]
-    pub direct_connection: bool,
-    #[serde(default)]
-    pub use_tls: bool,
-    #[serde(default)]
-    pub connect_timeout_seconds: Option<u64>,
-    #[serde(default)]
-    pub application_name: Option<String>,
-}
-
-/// 串口校验位
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum SerialParity {
-    #[default]
-    None,
-    Odd,
-    Even,
-}
-
-impl SerialParity {
-    pub fn all() -> &'static [SerialParity] {
-        &[SerialParity::None, SerialParity::Odd, SerialParity::Even]
-    }
-
-    pub fn label(&self) -> &'static str {
-        match self {
-            SerialParity::None => "None",
-            SerialParity::Odd => "Odd",
-            SerialParity::Even => "Even",
-        }
-    }
-}
-
-/// 串口流控
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum SerialFlowControl {
-    #[default]
-    None,
-    Software,
-    Hardware,
-}
-
-impl SerialFlowControl {
-    pub fn all() -> &'static [SerialFlowControl] {
-        &[
-            SerialFlowControl::None,
-            SerialFlowControl::Software,
-            SerialFlowControl::Hardware,
-        ]
-    }
-
-    pub fn label(&self) -> &'static str {
-        match self {
-            SerialFlowControl::None => "None",
-            SerialFlowControl::Software => "XON/XOFF",
-            SerialFlowControl::Hardware => "RTS/CTS",
-        }
-    }
-}
-
-/// 串口连接参数
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerialParams {
-    /// 串口设备路径，如 /dev/ttyUSB0 或 COM1
-    pub port_name: String,
-    /// 波特率
-    #[serde(default = "default_baud_rate")]
-    pub baud_rate: u32,
-    /// 数据位 (5/6/7/8)
-    #[serde(default = "default_data_bits")]
-    pub data_bits: u8,
-    /// 停止位 (1/2)
-    #[serde(default = "default_stop_bits")]
-    pub stop_bits: u8,
-    /// 校验位
-    #[serde(default)]
-    pub parity: SerialParity,
-    /// 流控
-    #[serde(default)]
-    pub flow_control: SerialFlowControl,
-}
-
-fn default_baud_rate() -> u32 {
-    115200
-}
-
-fn default_data_bits() -> u8 {
-    8
-}
-
-fn default_stop_bits() -> u8 {
-    1
-}
-
-impl Default for SerialParams {
-    fn default() -> Self {
-        Self {
-            port_name: String::new(),
-            baud_rate: 115200,
-            data_bits: 8,
-            stop_bits: 1,
-            parity: SerialParity::None,
-            flow_control: SerialFlowControl::None,
-        }
-    }
-}
-
 /// Connection configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbConnectionConfig {
@@ -452,10 +237,7 @@ impl DbConnectionConfig {
     }
 
     pub fn server_info(&self) -> String {
-        match self.database_type {
-            DatabaseType::SQLite => format!("{}", self.host),
-            _ => format!("{}:{}", self.host, self.port),
-        }
+        format!("{}:{}", self.host, self.port)
     }
 
     pub fn is_change(&self, other: &DbConnectionConfig) -> bool {
@@ -484,9 +266,6 @@ pub struct Workspace {
     pub created_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<i64>,
-    /// 云端 ID（用于同步）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cloud_id: Option<String>,
 }
 
 impl Entity for Workspace {
@@ -514,7 +293,6 @@ impl Workspace {
             icon: None,
             created_at: None,
             updated_at: None,
-            cloud_id: None,
         }
     }
 }
@@ -534,29 +312,10 @@ pub struct StoredConnection {
     pub selected_databases: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remark: Option<String>,
-    /// 是否启用云同步（默认 true）
-    #[serde(default = "default_sync_enabled")]
-    pub sync_enabled: bool,
-    /// 云端记录 ID（同步成功后获得）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cloud_id: Option<String>,
-    /// 最后同步时间戳
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_synced_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<i64>,
-    /// 团队归属 ID（None = 个人数据）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub team_id: Option<String>,
-    /// 连接创建者 ID（用户 UUID，用于权限判断）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner_id: Option<String>,
-}
-
-fn default_sync_enabled() -> bool {
-    true
 }
 
 impl Entity for StoredConnection {
@@ -593,13 +352,8 @@ impl StoredConnection {
                 None
             },
             remark: None,
-            sync_enabled: true,
-            cloud_id: None,
-            last_synced_at: None,
             created_at: None,
             updated_at: None,
-            team_id: None,
-            owner_id: None,
         }
     }
 
@@ -612,87 +366,9 @@ impl StoredConnection {
             workspace_id,
             selected_databases: None,
             remark: None,
-            sync_enabled: true,
-            cloud_id: None,
-            last_synced_at: None,
             created_at: None,
             updated_at: None,
-            team_id: None,
-            owner_id: None,
         }
-    }
-
-    pub fn new_redis(name: String, params: RedisParams, workspace_id: Option<i64>) -> Self {
-        Self {
-            id: None,
-            name,
-            connection_type: ConnectionType::Redis,
-            params: serde_json::to_string(&params).expect("RedisParams 序列化不应失败"),
-            workspace_id,
-            selected_databases: None,
-            remark: None,
-            sync_enabled: true,
-            cloud_id: None,
-            last_synced_at: None,
-            created_at: None,
-            updated_at: None,
-            team_id: None,
-            owner_id: None,
-        }
-    }
-
-    pub fn new_mongodb(name: String, params: MongoDBParams, workspace_id: Option<i64>) -> Self {
-        Self {
-            id: None,
-            name,
-            connection_type: ConnectionType::MongoDB,
-            params: serde_json::to_string(&params).expect("MongoDBParams 序列化不应失败"),
-            workspace_id,
-            selected_databases: None,
-            remark: None,
-            sync_enabled: true,
-            cloud_id: None,
-            last_synced_at: None,
-            created_at: None,
-            updated_at: None,
-            team_id: None,
-            owner_id: None,
-        }
-    }
-
-    pub fn to_ssh_params(&self) -> Result<SshParams, serde_json::Error> {
-        serde_json::from_str(&self.params)
-    }
-
-    pub fn to_redis_params(&self) -> Result<RedisParams, serde_json::Error> {
-        serde_json::from_str(&self.params)
-    }
-
-    pub fn to_mongodb_params(&self) -> Result<MongoDBParams, serde_json::Error> {
-        serde_json::from_str(&self.params)
-    }
-
-    pub fn new_serial(name: String, params: SerialParams, workspace_id: Option<i64>) -> Self {
-        Self {
-            id: None,
-            name,
-            connection_type: ConnectionType::Serial,
-            params: serde_json::to_string(&params).expect("SerialParams 序列化不应失败"),
-            workspace_id,
-            selected_databases: None,
-            remark: None,
-            sync_enabled: true,
-            cloud_id: None,
-            last_synced_at: None,
-            created_at: None,
-            updated_at: None,
-            team_id: None,
-            owner_id: None,
-        }
-    }
-
-    pub fn to_serial_params(&self) -> Result<SerialParams, serde_json::Error> {
-        serde_json::from_str(&self.params)
     }
 
     pub fn to_db_connection(&self) -> Result<DbConnectionConfig, serde_json::Error> {
@@ -780,90 +456,7 @@ impl KeyValue {
 
 pub fn parse_db_type(s: &str) -> DatabaseType {
     match s {
-        "MySQL" => DatabaseType::MySQL,
         "PostgreSQL" => DatabaseType::PostgreSQL,
-        "SQLite" => DatabaseType::SQLite,
-        _ => DatabaseType::MySQL,
-    }
-}
-
-#[cfg(test)]
-mod serial_tests {
-    use super::*;
-
-    #[test]
-    fn serial_params_serialize_deserialize() {
-        let params = SerialParams {
-            port_name: "/dev/ttyUSB0".to_string(),
-            baud_rate: 115200,
-            data_bits: 8,
-            stop_bits: 1,
-            parity: SerialParity::None,
-            flow_control: SerialFlowControl::None,
-        };
-        let json = serde_json::to_string(&params).unwrap();
-        let p2: SerialParams = serde_json::from_str(&json).unwrap();
-        assert_eq!(p2.port_name, "/dev/ttyUSB0");
-        assert_eq!(p2.baud_rate, 115200);
-        assert_eq!(p2.data_bits, 8);
-        assert_eq!(p2.stop_bits, 1);
-        assert_eq!(p2.parity, SerialParity::None);
-        assert_eq!(p2.flow_control, SerialFlowControl::None);
-    }
-
-    #[test]
-    fn serial_params_defaults_from_minimal_json() {
-        let json = r#"{"port_name":"/dev/tty0"}"#;
-        let p: SerialParams = serde_json::from_str(json).unwrap();
-        assert_eq!(p.port_name, "/dev/tty0");
-        assert_eq!(p.baud_rate, 115200);
-        assert_eq!(p.data_bits, 8);
-        assert_eq!(p.stop_bits, 1);
-        assert_eq!(p.parity, SerialParity::None);
-        assert_eq!(p.flow_control, SerialFlowControl::None);
-    }
-
-    #[test]
-    fn stored_connection_serial_roundtrip() {
-        let params = SerialParams {
-            port_name: "/dev/cu.usbserial-1420".to_string(),
-            baud_rate: 9600,
-            data_bits: 7,
-            stop_bits: 2,
-            parity: SerialParity::Even,
-            flow_control: SerialFlowControl::Hardware,
-        };
-        let conn = StoredConnection::new_serial("我的串口".to_string(), params, Some(42));
-        assert_eq!(conn.connection_type, ConnectionType::Serial);
-        assert_eq!(conn.name, "我的串口");
-        assert_eq!(conn.workspace_id, Some(42));
-
-        let rt = conn.to_serial_params().unwrap();
-        assert_eq!(rt.port_name, "/dev/cu.usbserial-1420");
-        assert_eq!(rt.baud_rate, 9600);
-        assert_eq!(rt.data_bits, 7);
-        assert_eq!(rt.stop_bits, 2);
-        assert_eq!(rt.parity, SerialParity::Even);
-        assert_eq!(rt.flow_control, SerialFlowControl::Hardware);
-    }
-
-    #[test]
-    fn connection_type_serial_methods() {
-        assert_eq!(ConnectionType::Serial.label(), "串口");
-        assert_eq!(ConnectionType::from_str("Serial"), ConnectionType::Serial);
-        assert_eq!(format!("{}", ConnectionType::Serial), "Serial");
-        assert!(ConnectionType::all().contains(&ConnectionType::Serial));
-    }
-
-    #[test]
-    fn serial_enums_defaults_and_labels() {
-        assert_eq!(SerialParity::default(), SerialParity::None);
-        assert_eq!(SerialFlowControl::default(), SerialFlowControl::None);
-        assert_eq!(SerialParity::all().len(), 3);
-        assert_eq!(SerialFlowControl::all().len(), 3);
-        assert_eq!(SerialParity::Odd.label(), "Odd");
-        assert_eq!(SerialParity::Even.label(), "Even");
-        assert_eq!(SerialFlowControl::Software.label(), "XON/XOFF");
-        assert_eq!(SerialFlowControl::Hardware.label(), "RTS/CTS");
+        _ => DatabaseType::PostgreSQL,
     }
 }

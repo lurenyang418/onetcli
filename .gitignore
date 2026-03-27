@@ -5,7 +5,6 @@
 .vscode
 index.scip
 *.log
-node_modules/
 
 # Rust build artifacts
 target/
@@ -42,3 +41,10 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# temp
+tmp
+temp
+
+# dmg
+*.dmg

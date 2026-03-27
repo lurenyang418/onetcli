@@ -128,7 +128,7 @@ impl DatabaseTabView {
                 return (connection_id, None, None, db_config.database_type);
             }
         }
-        (String::new(), None, None, DatabaseType::SQLite)
+        (String::new(), None, None, DatabaseType::PostgreSQL)
     }
 
     pub fn new_with_active_conn(

@@ -1,8 +1,6 @@
 use anyhow::Result;
 use moka::sync::Cache;
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -38,61 +36,32 @@ impl CacheContext {
         }
     }
 
-    /// 计算字符串的短 hash（8位十六进制）
-    fn short_hash(s: &str) -> String {
-        let mut hasher = DefaultHasher::new();
-        s.hash(&mut hasher);
-        format!("{:08x}", hasher.finish() as u32)
-    }
 
     /// 生成缓存目录名
     /// - 网络数据库: {database_type}/{host}_{port}
-    /// - SQLite: {database_type}/{db_name}_{path_hash}
     pub fn cache_dir_name(&self) -> String {
-        if self.database_type == DatabaseType::SQLite || self.port == 0 {
-            let path = std::path::Path::new(&self.host);
-            let db_name = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unknown");
-            let safe_name = db_name.replace([':', '/', '\\', '<', '>', '|', '?', '*', '.'], "_");
-            let hash = Self::short_hash(&self.host);
-            format!("{}/{}_{}", self.database_type.as_str(), safe_name, hash)
-        } else {
-            let safe_host = self
-                .host
-                .replace([':', '/', '\\', '<', '>', '|', '?', '*', '.'], "_");
-            format!(
-                "{}/{}_{}",
-                self.database_type.as_str(),
-                safe_host,
-                self.port
-            )
-        }
+        let safe_host = self
+            .host
+            .replace([':', '/', '\\', '<', '>', '|', '?', '*', '.'], "_");
+        format!(
+            "{}/{}_{}",
+            self.database_type.as_str(),
+            safe_host,
+            self.port
+        )
     }
 
     /// 生成缓存键前缀
     pub fn cache_key_prefix(&self) -> String {
-        if self.database_type == DatabaseType::SQLite || self.port == 0 {
-            let path = std::path::Path::new(&self.host);
-            let db_name = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unknown");
-            let safe_name = db_name.replace([':', '/', '\\', '<', '>', '|', '?', '*', '.'], "_");
-            let hash = Self::short_hash(&self.host);
-            format!("sqlite_{}_{}", safe_name, hash)
-        } else {
-            let safe_host = self
-                .host
-                .replace([':', '/', '\\', '<', '>', '|', '?', '*', '.'], "_");
-            format!(
-                "{}_{}_{}",
-                self.database_type.as_str().to_lowercase(),
-                safe_host,
-                self.port
-            )
-        }
+        let safe_host = self
+            .host
+            .replace([':', '/', '\\', '<', '>', '|', '?', '*', '.'], "_");
+        format!(
+            "{}_{}_{}",
+            self.database_type.as_str().to_lowercase(),
+            safe_host,
+            self.port
+        )
     }
 }
 

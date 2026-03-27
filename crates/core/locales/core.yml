@@ -64,15 +64,10 @@ AiChat:
     zh-CN: "操作已取消"
     zh-HK: "操作已取消"
   operation_cancelled_markdown:
-    en: "
-
-*Operation cancelled*"
-    zh-CN: "
-
-*操作已取消*"
-    zh-HK: "
-
-*操作已取消*"
+    en: "*Operation cancelled*"
+    zh-CN: "*操作已取消*"
+    zh-HK: "*操作已取消*"
+  
   stream_provider_not_found:
     en: "AI model not found."
     zh-CN: "AI 模型未找到"
@@ -110,59 +105,50 @@ AiChat:
     zh-CN: "未知时间"
     zh-HK: "未知時間"
   ask_ai_template:
-    en: "I encountered an error while running the following SQL:
-
-```sql
-%{sql}
-```
-
-Error message:
-```
-%{error}
-```"
+    en: "I encountered an error while running the following SQL:```sql
+      %{sql}
+        ```
+      Error message:
+      ```
+      %{error}
+      ```"
     zh-CN: "我在执行以下SQL时遇到了错误：
 
-```sql
-%{sql}
-```
+      ```sql
+      %{sql}
+      ```
 
-错误信息：
-```
-%{error}
-```"
+      错误信息：
+      ```
+      %{error}
+      ```"
     zh-HK: "我在執行以下SQL時遇到了錯誤：
 
-```sql
-%{sql}
-```
+      ```sql
+      %{sql}
+      ```
 
-錯誤信息：
-```
-%{error}
-```"
+      錯誤信息：
+      ```
+      %{error}
+      ```"
   ask_ai_context:
     en: "
 
-Context:
-%{context}"
+      Context:
+      %{context}"
     zh-CN: "
 
-上下文信息：
-%{context}"
+      上下文信息：
+      %{context}"
     zh-HK: "
 
-上下文資訊：
-%{context}"
+      上下文資訊：
+      %{context}"
   ask_ai_request_help:
-    en: "
-
-Please help me analyze this error and provide a solution."
-    zh-CN: "
-
-请帮我分析这个错误并提供解决方案。"
-    zh-HK: "
-
-請幫我分析這個錯誤並提供解決方案。"
+    en: " Please help me analyze this error and provide a solution."
+    zh-CN: "请帮我分析这个错误并提供解决方案。"
+    zh-HK: "請幫我分析這個錯誤並提供解決方案。"
   ask_ai_button:
     en: "Ask AI"
     zh-CN: "询问AI"

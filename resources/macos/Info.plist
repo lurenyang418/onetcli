@@ -3,19 +3,19 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>OnetCli</string>
+    <string>pig</string>
     <key>CFBundleDisplayName</key>
-    <string>OnetCli</string>
+    <string>pig</string>
     <key>CFBundleIdentifier</key>
-    <string>com.onetcli.app</string>
+    <string>com.pig.app</string>
     <key>CFBundleVersion</key>
-    <string>${ONETCLI_VERSION}</string>
+    <string>${PIG_VERSION}</string>
     <key>CFBundleShortVersionString</key>
-    <string>${ONETCLI_VERSION}</string>
+    <string>${PIG_VERSION}</string>
     <key>CFBundleExecutable</key>
-    <string>onetcli</string>
+    <string>pig</string>
     <key>CFBundleIconFile</key>
-    <string>OnetCli</string>
+    <string>pig</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>

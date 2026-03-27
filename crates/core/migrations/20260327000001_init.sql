@@ -1,20 +1,18 @@
--- Initial schema (merged migrations)
+-- 初始化数据库 schema
 
--- Workspaces
+-- Workspaces (工作空间)
 CREATE TABLE IF NOT EXISTS workspaces (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     color TEXT,
     icon TEXT,
-    cloud_id TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_workspaces_name ON workspaces(name);
-CREATE INDEX IF NOT EXISTS idx_workspaces_cloud_id ON workspaces(cloud_id);
 
--- Connections
+-- Connections (连接)
 CREATE TABLE IF NOT EXISTS connections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -23,9 +21,7 @@ CREATE TABLE IF NOT EXISTS connections (
     workspace_id INTEGER,
     selected_databases TEXT,
     remark TEXT,
-    sync_enabled INTEGER NOT NULL DEFAULT 1,
-    cloud_id TEXT,
-    last_synced_at INTEGER,
+    owner_id TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
@@ -33,9 +29,9 @@ CREATE TABLE IF NOT EXISTS connections (
 
 CREATE INDEX IF NOT EXISTS idx_connections_name ON connections(name);
 CREATE INDEX IF NOT EXISTS idx_connections_workspace ON connections(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_connections_cloud_id ON connections(cloud_id);
+CREATE INDEX IF NOT EXISTS idx_connections_owner ON connections(owner_id);
 
--- Queries
+-- Queries (查询)
 CREATE TABLE IF NOT EXISTS queries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -50,7 +46,7 @@ CREATE TABLE IF NOT EXISTS queries (
 CREATE INDEX IF NOT EXISTS idx_queries_connection ON queries(connection_id);
 CREATE INDEX IF NOT EXISTS idx_queries_database ON queries(database_name) WHERE database_name IS NOT NULL;
 
--- LLM Providers
+-- LLM Providers (LLM 提供商)
 CREATE TABLE IF NOT EXISTS llm_providers (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
@@ -68,7 +64,7 @@ CREATE TABLE IF NOT EXISTS llm_providers (
     updated_at INTEGER NOT NULL
 );
 
--- Chat Sessions
+-- Chat Sessions (聊天会话)
 CREATE TABLE IF NOT EXISTS chat_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -79,7 +75,7 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_provider_id ON chat_sessions (provider_id);
 
--- Chat Messages
+-- Chat Messages (聊天消息)
 CREATE TABLE IF NOT EXISTS chat_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id INTEGER NOT NULL,
@@ -91,7 +87,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages (session_id);
 
--- Quick Commands
+-- Quick Commands (快捷命令)
 CREATE TABLE IF NOT EXISTS quick_commands (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
@@ -107,13 +103,3 @@ CREATE TABLE IF NOT EXISTS quick_commands (
 
 CREATE INDEX IF NOT EXISTS idx_quick_commands_connection ON quick_commands(connection_id);
 CREATE INDEX IF NOT EXISTS idx_quick_commands_order ON quick_commands(pinned DESC, sort_order ASC);
-
--- Pending Cloud Deletions
-CREATE TABLE IF NOT EXISTS pending_cloud_deletions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cloud_id TEXT NOT NULL UNIQUE,
-    entity_type TEXT NOT NULL DEFAULT 'connection',
-    created_at INTEGER NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_pending_cloud_deletions_entity_type ON pending_cloud_deletions(entity_type);

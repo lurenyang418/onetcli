@@ -2533,36 +2533,23 @@ mod tests {
     use one_ui::edit_table::ColumnSort;
 
     #[test]
-    fn build_header_order_by_clause_quotes_mysql_identifier() {
+    fn build_header_order_by_clause_quotes_postgresql_identifier() {
         let clause = build_header_order_by_clause(
             &DbManager::default(),
-            DatabaseType::MySQL,
+            DatabaseType::PostgreSQL,
             "order",
             ColumnSort::Descending,
         )
         .expect("should build order by clause");
 
-        assert_eq!(clause.as_deref(), Some("`order` DESC"));
-    }
-
-    #[test]
-    fn build_header_order_by_clause_quotes_postgresql_identifier() {
-        let clause = build_header_order_by_clause(
-            &DbManager::default(),
-            DatabaseType::PostgreSQL,
-            "created_at",
-            ColumnSort::Ascending,
-        )
-        .expect("should build order by clause");
-
-        assert_eq!(clause.as_deref(), Some("\"created_at\" ASC"));
+        assert_eq!(clause.as_deref(), Some("\"order\" DESC"));
     }
 
     #[test]
     fn build_header_order_by_clause_clears_default_sort() {
         let clause = build_header_order_by_clause(
             &DbManager::default(),
-            DatabaseType::SQLite,
+            DatabaseType::PostgreSQL,
             "id",
             ColumnSort::Default,
         )

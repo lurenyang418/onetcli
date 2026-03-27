@@ -276,18 +276,6 @@ ConnectionForm:
     en: Database File Path
     zh-CN: 数据库文件路径
     zh-HK: 資料庫檔案路徑
-  workspace:
-    en: Workspace
-    zh-CN: 工作区
-    zh-HK: 工作區
-  cloud_sync:
-    en: Cloud Sync
-    zh-CN: 云同步
-    zh-HK: 雲同步
-  cloud_sync_desc:
-    en: Sync this connection to cloud
-    zh-CN: 同步此连接到云端
-    zh-HK: 同步此連線到雲端
   remark:
     en: Remark
     zh-CN: 备注
@@ -371,50 +359,6 @@ ConnectionForm:
     zh-CN: 输入连接备注信息...
     zh-HK: 輸入連線備註資訊...
 
-  # SQL Server 特定
-  encrypt:
-    en: Encrypt
-    zh-CN: 加密
-    zh-HK: 加密
-  encrypt_off:
-    en: "Off"
-    zh-CN: 关闭
-    zh-HK: 關閉
-  encrypt_on:
-    en: "On"
-    zh-CN: 开启
-    zh-HK: 開啟
-  encrypt_strict:
-    en: Strict
-    zh-CN: 强制
-    zh-HK: 強制
-  trust_certificate:
-    en: Trust Certificate
-    zh-CN: 信任证书
-    zh-HK: 信任憑證
-
-  # Oracle 特定
-  username_schema:
-    en: Username/Schema
-    zh-CN: 用户名/Schema
-    zh-HK: 使用者名稱/Schema
-  charset:
-    en: Character Set
-    zh-CN: 字符集
-    zh-HK: 字元集
-  default_tablespace:
-    en: Default Tablespace
-    zh-CN: 默认表空间
-    zh-HK: 預設表空間
-  tablespace_users:
-    en: USERS (optional)
-    zh-CN: USERS (可选)
-    zh-HK: USERS (可選)
-  enter_username_schema:
-    en: "Enter username/schema"
-    zh-CN: 输入用户名/Schema
-    zh-HK: 輸入使用者名稱/Schema
-
   # 字符集选项
   charset_utf8:
     en: Unicode UTF-8 (Recommended)
@@ -441,30 +385,6 @@ ConnectionForm:
     zh-CN: 韩文
     zh-HK: 韓文
 
-  # ClickHouse 特定
-  compression:
-    en: Compression
-    zh-CN: 压缩
-    zh-HK: 壓縮
-  schema_http:
-    en: HTTP
-    zh-CN: HTTP
-    zh-HK: HTTP
-  schema_https:
-    en: HTTPS
-    zh-CN: HTTPS
-    zh-HK: HTTPS
-
-  # SQLite 特定
-  select_database_file:
-    en: Select SQLite Database File
-    zh-CN: 选择SQLite数据库文件
-    zh-HK: 選擇SQLite資料庫檔案
-  file_selected:
-    en: Selected
-    zh-CN: 已选择
-    zh-HK: 已選擇
-
   # 测试连接
   test_success:
     en: Connection successful!
@@ -474,58 +394,6 @@ ConnectionForm:
     en: Test connection failed
     zh-CN: 测试连接失败
     zh-HK: 測試連線失敗
-  oracle_client_required:
-    en: "Oracle Client is not available: %{error}"
-    zh-CN: "未检测到可用的 Oracle Client：%{error}"
-    zh-HK: "未檢測到可用的 Oracle Client：%{error}"
-  oracle_client_status:
-    en: Oracle Client
-    zh-CN: Oracle 客户端
-    zh-HK: Oracle 客戶端
-  oracle_client_checking:
-    en: Checking...
-    zh-CN: 检测中...
-    zh-HK: 檢測中...
-  oracle_client_available:
-    en: "Available (%{version})"
-    zh-CN: "可用（%{version}）"
-    zh-HK: "可用（%{version}）"
-  oracle_client_unavailable:
-    en: "Unavailable (%{error})"
-    zh-CN: "不可用（%{error}）"
-    zh-HK: "不可用（%{error}）"
-  oracle_client_open_download:
-    en: Download
-    zh-CN: 前往下载
-    zh-HK: 前往下載
-  oracle_client_copy_url:
-    en: Copy URL
-    zh-CN: 复制链接
-    zh-HK: 複製連結
-  oracle_client_guide_label:
-    en: Help
-    zh-CN: 说明
-    zh-HK: 說明
-  oracle_client_guide_title:
-    en: Installation Guide
-    zh-CN: 安装说明
-    zh-HK: 安裝說明
-  oracle_client_guide_windows:
-    en: "Please download Oracle Instant Client (x64), unzip and add to PATH, then restart the app."
-    zh-CN: "请下载 Oracle Instant Client（x64），解压后将目录加入 PATH，然后重启应用。"
-    zh-HK: "請下載 Oracle Instant Client（x64），解壓後將目錄加入 PATH，然後重啟應用。"
-  oracle_client_guide_macos:
-    en: "Please download Oracle Instant Client for macOS, place libclntsh.dylib in a discoverable path or set DYLD_LIBRARY_PATH, then restart the app."
-    zh-CN: "请下载 macOS 版 Oracle Instant Client，将 libclntsh.dylib 放到可搜索路径或设置 DYLD_LIBRARY_PATH，然后重启应用。"
-    zh-HK: "請下載 macOS 版 Oracle Instant Client，將 libclntsh.dylib 放到可搜尋路徑或設定 DYLD_LIBRARY_PATH，然後重啟應用。"
-  oracle_client_guide_linux:
-    en: "Please download Oracle Instant Client for Linux, set LD_LIBRARY_PATH to the Instant Client directory, then restart the app."
-    zh-CN: "请下载 Linux 版 Oracle Instant Client，通过 LD_LIBRARY_PATH 配置库路径，然后重启应用。"
-    zh-HK: "請下載 Linux 版 Oracle Instant Client，透過 LD_LIBRARY_PATH 設定庫路徑，然後重啟應用。"
-  oracle_client_guide_other:
-    en: "Please download Oracle Instant Client for your platform, ensure the client library is discoverable, then restart the app."
-    zh-CN: "请下载适用于您平台的 Oracle Instant Client，确保客户端库可被系统发现，然后重启应用。"
-    zh-HK: "請下載適用於您平台的 Oracle Instant Client，確保客戶端庫可被系統發現，然後重啟應用。"
 
   connection_failed:
     en: Connection failed
@@ -606,10 +474,6 @@ Database:
     en: File Path
     zh-CN: 文件路径
     zh-HK: 檔案路徑
-  file_path_placeholder:
-    en: "Database file path (e.g., /path/to/database.db)"
-    zh-CN: "数据库文件路径 (如: /path/to/database.db)"
-    zh-HK: "資料庫檔案路徑 (如: /path/to/database.db)"
   schema_name:
     en: Schema Name
     zh-CN: 模式名称
@@ -630,62 +494,6 @@ Database:
     en: "Enter remark (optional)"
     zh-CN: 输入备注信息(可选)
     zh-HK: 輸入備註資訊(可選)
-
-  # ClickHouse 引擎类型
-  engine_atomic:
-    en: Atomic Database Engine (Default, ClickHouse 20.5+)
-    zh-CN: 原子数据库引擎 (默认, ClickHouse 20.5+)
-    zh-HK: 原子資料庫引擎 (預設, ClickHouse 20.5+)
-  engine_ordinary:
-    en: Ordinary Database Engine
-    zh-CN: 普通数据库引擎
-    zh-HK: 普通資料庫引擎
-  engine_memory:
-    en: Memory Database Engine
-    zh-CN: 内存数据库引擎
-    zh-HK: 記憶體資料庫引擎
-  engine_lazy:
-    en: Lazy Database Engine (Log Tables)
-    zh-CN: 懒加载数据库引擎 (日志表)
-    zh-HK: 懶載入資料庫引擎 (日誌表)
-  engine_mysql:
-    en: MySQL Engine (Connect to external MySQL)
-    zh-CN: MySQL 引擎 (连接外部 MySQL)
-    zh-HK: MySQL 引擎 (連線外部 MySQL)
-  engine_postgresql:
-    en: PostgreSQL Engine (Connect to external PostgreSQL)
-    zh-CN: PostgreSQL 引擎 (连接外部 PostgreSQL)
-    zh-HK: PostgreSQL 引擎 (連線外部 PostgreSQL)
-  engine_comment:
-    en: Database Comment (optional)
-    zh-CN: 数据库注释 (可选)
-    zh-HK: 資料庫註釋 (可選)
-
-  # MySQL 排序规则
-  collation_latin1_general_ci:
-    en: Latin1 General, case-insensitive (Default)
-    zh-CN: Latin1 General, case-insensitive (默认)
-    zh-HK: Latin1 General, case-insensitive (預設)
-  collation_utf8mb4_general_ci:
-    en: Simplified Chinese, case-insensitive
-    zh-CN: 简体中文, case-insensitive
-    zh-HK: 簡體中文, case-insensitive
-  collation_utf8mb4_bin:
-    en: Simplified Chinese, case-sensitive
-    zh-CN: 简体中文, case-sensitive
-    zh-HK: 簡體中文, case-sensitive
-  collation_utf8mb4_zh_hk_0900_as_cs:
-    en: Traditional Chinese, case-insensitive
-    zh-CN: 繁体中文, case-insensitive
-    zh-HK: 繁體中文, case-insensitive
-  collation_utf8mb4_ja_0900_as_cs:
-    en: Japanese, case-insensitive
-    zh-CN: 日文, case-insensitive
-    zh-HK: 日文, case-insensitive
-  collation_utf8mb4_ko_0900_as_cs:
-    en: Korean, case-insensitive
-    zh-CN: 韩文, case-insensitive
-    zh-HK: 韓文, case-insensitive
 
 # 表操作
 Table:
@@ -2801,14 +2609,3 @@ DatabaseTab:
     en: Open New Editor
     zh-CN: 打开新编辑器
     zh-HK: 打開新編輯器
-
-# 团队同步
-TeamSync:
-  personal:
-    en: Personal
-    zh-CN: 个人
-    zh-HK: 個人
-  team_label:
-    en: Team
-    zh-CN: 团队归属
-    zh-HK: 團隊歸屬

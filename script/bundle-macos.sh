@@ -1,10 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-APP_NAME="OnetCli"
-BINARY_NAME="onetcli"
+APP_NAME="pig"
+BINARY_NAME="pig"
 TARGET="${1:-aarch64-apple-darwin}"
-VERSION="${ONETCLI_VERSION:-0.1.0}"
+VERSION="${PIG_VERSION:-0.1.0}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="${PROJECT_DIR}/target/${APP_NAME}.app"
@@ -28,17 +28,17 @@ fi
 cp "$BINARY_PATH" "$APP_DIR/Contents/MacOS/${BINARY_NAME}"
 
 # Copy Info.plist and substitute version
-sed "s/\${ONETCLI_VERSION}/${VERSION}/g" \
+sed "s/\${PIG_VERSION}/${VERSION}/g" \
     "${PROJECT_DIR}/resources/macos/Info.plist" \
     > "$APP_DIR/Contents/Info.plist"
 
-# Regenerate macOS icon from logo.svg before bundling to avoid stale .icns assets.
+# Regenerate macOS icon from logo.png before bundling to avoid stale .icns assets.
 bash "${PROJECT_DIR}/script/generate-macos-icon.sh"
 
 # Copy icon
-ICNS_PATH="${PROJECT_DIR}/resources/macos/OnetCli.icns"
+ICNS_PATH="${PROJECT_DIR}/resources/macos/pig.icns"
 if [ -f "$ICNS_PATH" ]; then
-    cp "$ICNS_PATH" "$APP_DIR/Contents/Resources/OnetCli.icns"
+    cp "$ICNS_PATH" "$APP_DIR/Contents/Resources/pig.icns"
 else
     echo "Warning: Icon file not found at ${ICNS_PATH}"
 fi
