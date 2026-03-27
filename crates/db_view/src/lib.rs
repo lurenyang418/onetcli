@@ -11,7 +11,6 @@ mod db_tree_event;
 pub mod db_tree_view;
 mod import_export;
 pub mod postgresql;
-mod sidebar;
 pub mod sql_editor;
 #[cfg(test)]
 mod sql_editor_completion_tests;

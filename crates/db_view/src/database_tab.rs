@@ -3,7 +3,6 @@ use std::ops::Deref;
 use crate::database_objects_tab::DatabaseObjectsPanel;
 use crate::db_tree_event::DatabaseEventHandler;
 use crate::db_tree_view::DbTreeView;
-use crate::sidebar::{DatabaseSidebar, DatabaseSidebarEvent};
 use crate::sql_editor_view::SqlEditorTab;
 use db::GlobalDbState;
 use gpui::{
@@ -13,10 +12,6 @@ use gpui::{
     Styled, Task, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_component::{ActiveTheme, Icon, IconName, Sizable, Size, h_flex, v_flex};
-use one_core::ai_chat::{CodeBlockAction, LanguageMatcher};
-use one_core::layout::{
-    SIDEBAR_DEFAULT_WIDTH, TOOLBAR_WIDTH,
-};
 use one_core::storage::{ActiveConnections, DatabaseType, Workspace};
 use one_core::{
     storage::StoredConnection,
@@ -61,10 +56,7 @@ pub struct DatabaseTabView {
     _event_handler: Entity<DatabaseEventHandler>,
     workspace: Option<Workspace>,
     focus_handle: FocusHandle,
-    sidebar: Entity<DatabaseSidebar>,
-    _subscriptions: Vec<gpui::Subscription>,
     tree_panel_size: Pixels,
-    sidebar_panel_size: Pixels,
     resizing: Option<ResizingPanel>,
     bounds: Bounds<Pixels>,
 }
@@ -163,26 +155,6 @@ impl DatabaseTabView {
             )
         });
 
-        let sidebar = cx.new(|cx| DatabaseSidebar::new(window, cx, ()));
-
-        // 注册 SQL 代码块操作
-        Self::register_sql_code_block_actions(&sidebar, tab_container.clone(), &connections, cx);
-
-        let mut subscriptions = Vec::new();
-        subscriptions.push(
-            cx.subscribe(
-                &sidebar,
-                |_this, _, event: &DatabaseSidebarEvent, cx| match event {
-                    DatabaseSidebarEvent::PanelChanged => {
-                        cx.notify();
-                    }
-                    DatabaseSidebarEvent::AskAi => {
-                        cx.notify();
-                    }
-                },
-            ),
-        );
-
         let mut global_state = cx.global::<GlobalDbState>().clone();
 
         let connections_clone = connections.clone();
@@ -210,10 +182,7 @@ impl DatabaseTabView {
             _event_handler: event_handler,
             workspace,
             focus_handle: cx.focus_handle(),
-            sidebar,
-            _subscriptions: subscriptions,
             tree_panel_size: TREE_PANEL_DEFAULT_SIZE,
-            sidebar_panel_size: SIDEBAR_DEFAULT_WIDTH,
             resizing: None,
             bounds: Bounds::default(),
         }
@@ -227,105 +196,6 @@ impl DatabaseTabView {
     ) -> Self {
         let active_conn_id = connection.id;
         Self::new_with_active_conn(workspace, vec![connection], active_conn_id, window, cx)
-    }
-
-    pub fn ask_ai(&mut self, message: String, cx: &mut Context<Self>) {
-        self.sidebar.update(cx, |sidebar, cx| {
-            sidebar.ask_ai(message, cx);
-        });
-        cx.notify();
-    }
-
-    /// 注册 SQL 代码块操作
-    fn register_sql_code_block_actions(
-        sidebar: &Entity<DatabaseSidebar>,
-        tab_container: Entity<TabContainer>,
-        connections: &[StoredConnection],
-        cx: &mut App,
-    ) {
-        // 获取第一个连接的信息用于创建新编辑器
-        let first_conn = connections.first().cloned();
-
-        // 操作1：插入到当前编辑器
-        let tab_container_for_insert = tab_container.clone();
-        if let Some(insert_action) = CodeBlockAction::new("sql-insert-to-editor")
-            .icon(IconName::Edit)
-            .label(t!("DatabaseTab.insert_editor").to_string())
-            .matcher(LanguageMatcher::sql())
-            .on_click(move |code, _lang, window, cx| {
-                // 获取当前激活的 tab
-                if let Some(active_tab) = tab_container_for_insert.read(cx).active_tab() {
-                    // 检查是否是 SQL 编辑器
-                    if active_tab.content().content_key(cx) == "SqlEditor" {
-                        if let Ok(sql_editor) =
-                            active_tab.content().view().downcast::<SqlEditorTab>()
-                        {
-                            sql_editor.update(cx, |editor, cx| {
-                                editor.set_sql(code, window, cx);
-                            });
-                        }
-                    }
-                }
-            })
-            .build()
-        {
-            sidebar.update(cx, |s, cx| {
-                s.register_code_block_action(insert_action, cx);
-            });
-        }
-
-        // 操作2：打开新编辑器
-        let tab_container_for_new = tab_container.clone();
-        if let Some(new_editor_action) = CodeBlockAction::new("sql-open-new-editor")
-            .icon(IconName::Query)
-            .label(t!("DatabaseTab.open_new_editor").to_string())
-            .matcher(LanguageMatcher::sql())
-            .on_click(move |code, _lang, window, cx| {
-                let Some(conn) = first_conn.as_ref() else {
-                    return;
-                };
-                let Ok(db_config) = conn.to_db_connection() else {
-                    return;
-                };
-
-                let connection_id = conn.id.map(|id| id.to_string()).unwrap_or_default();
-                let database_type = db_config.database_type;
-                let tab_id = format!("query-ai-{}", Uuid::new_v4());
-                let tab_id_clone = tab_id.clone();
-                let conn_id_clone = connection_id.clone();
-                let code_clone = code.clone();
-
-                tab_container_for_new.update(cx, |container, cx| {
-                    container.activate_or_add_tab_lazy(
-                        tab_id.clone(),
-                        move |window, cx| {
-                            let sql_editor = cx.new(|cx| {
-                                let editor = SqlEditorTab::new_with_config(
-                                    "AI Query",
-                                    connection_id.clone(),
-                                    database_type,
-                                    None,
-                                    None,
-                                    None,
-                                    window,
-                                    cx,
-                                );
-                                editor.set_sql(code_clone.clone(), window, cx);
-                                editor
-                            });
-                            TabItem::new(tab_id_clone.clone(), conn_id_clone.clone(), sql_editor)
-                        },
-                        window,
-                        cx,
-                    );
-                });
-            })
-            .build()
-        {
-            sidebar.update(cx, |s, cx| {
-                s.register_code_block_action(new_editor_action, cx);
-            });
-        }
     }
 
     fn render_tree_resize_handle(
@@ -362,14 +232,7 @@ impl DatabaseTabView {
         match resizing {
             ResizingPanel::TreePanel => {
                 let new_size = mouse_position.x - self.bounds.left();
-                let sidebar_visible = self.sidebar.read(cx).is_panel_visible();
-                let sidebar_width = if sidebar_visible {
-                    self.sidebar_panel_size
-                } else {
-                    TOOLBAR_WIDTH
-                };
-                let max_size =
-                    (available_width - PANEL_MIN_SIZE - sidebar_width).max(PANEL_MIN_SIZE);
+                let max_size = (available_width - PANEL_MIN_SIZE).max(PANEL_MIN_SIZE);
                 self.tree_panel_size = new_size.clamp(PANEL_MIN_SIZE, max_size);
             }
         }
@@ -524,18 +387,6 @@ impl TabContent for DatabaseTabView {
         true
     }
 
-    fn on_activate(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
-        self.sidebar.update(cx, |sidebar, cx| {
-            sidebar.set_active(true, cx);
-        });
-    }
-
-    fn on_deactivate(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
-        self.sidebar.update(cx, |sidebar, cx| {
-            sidebar.set_active(false, cx);
-        });
-    }
-
     fn try_close(
         &mut self,
         _tab_id: &str,
@@ -594,8 +445,6 @@ impl Render for DatabaseTabView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let is_connected_flag = *self.is_connected.read(cx);
         let view = cx.entity().clone();
-        let sidebar_visible = self.sidebar.read(cx).is_panel_visible();
-        let sidebar_panel_size = self.sidebar_panel_size;
 
         div()
             .track_focus(&self.focus_handle)
@@ -630,17 +479,6 @@ impl Render for DatabaseTabView {
                                 .min_w_0()
                                 .child(self.tab_container.clone()),
                         )
-                        .when(sidebar_visible, |this| {
-                            this.child(
-                                div()
-                                    .relative()
-                                    .h_full()
-                                    .w(sidebar_panel_size)
-                                    .flex_shrink_0()
-                                    .child(self.sidebar.clone()),
-                            )
-                        })
-                        .when(!sidebar_visible, |this| this.child(self.sidebar.clone()))
                         .child(ResizeEventHandler { view }),
                 )
             })
