@@ -5,7 +5,7 @@ publish.workspace = true
 edition.workspace = true
 
 [[bin]]
-name = "onetcli"
+name = "pig"
 path = "src/main.rs"
 
 [dependencies]

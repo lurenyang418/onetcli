@@ -5,7 +5,7 @@ use gpui::{
 };
 
 actions!(
-    onetcli_app,
+    pig_app,
     [
         ActivateTab1,
         ActivateTab2,
@@ -136,7 +136,7 @@ pub fn init(cx: &mut App) {
         .with(env_filter)
         .init();
     let http_client =
-        std::sync::Arc::new(ReqwestClient::user_agent("one-hub").expect("HTTP 客户端初始化失败"));
+        std::sync::Arc::new(ReqwestClient::user_agent("pig").expect("HTTP 客户端初始化失败"));
     cx.set_http_client(http_client);
     gpui_component::init(cx);
     one_core::init(cx);
@@ -232,13 +232,13 @@ pub fn init(cx: &mut App) {
     cx.activate(true);
 }
 
-pub struct OnetCliApp {
+pub struct PigApp {
     tab_container: Entity<TabContainer>,
     last_layout_state: Option<TabContainerState>,
     _save_layout_task: Option<Task<()>>,
 }
 
-impl OnetCliApp {
+impl PigApp {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let tab_container = cx.new(|cx| {
             let mut container = TabContainer::new(window, cx)
@@ -343,7 +343,7 @@ impl OnetCliApp {
     }
 }
 
-impl Render for OnetCliApp {
+impl Render for PigApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let sheet_layer = Root::render_sheet_layer(window, cx);
         let dialog_layer = Root::render_dialog_layer(window, cx);

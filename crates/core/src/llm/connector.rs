@@ -128,10 +128,10 @@ impl LlmConnector {
                     .ok_or_else(|| anyhow::anyhow!("Base URL required for OpenAI Compatible"))?;
                 LlmClient::openai_compatible(api_key, base_url, &config.name)?
             }
-            ProviderType::OnetCli => {
-                // OnetCli 使用专门的 OnetCliLLMProvider，不通过 LlmConnector 创建
+            ProviderType::Pig => {
+                // Pig 使用专门的 PigLLMProvider，不通过 LlmConnector 创建
                 anyhow::bail!(
-                    "OnetCli provider should be created via ProviderManager, not LlmConnector"
+                    "Pig provider should be created via ProviderManager, not LlmConnector"
                 )
             }
         };

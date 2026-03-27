@@ -3,11 +3,11 @@
 rust_i18n::i18n!("locales", fallback = "en");
 
 mod home;
-mod onetcli_app;
+mod pig_app;
 mod settings;
 mod update;
 
-use crate::onetcli_app::OnetCliApp;
+use crate::pig_app::PigApp;
 use db::GlobalDbState;
 use db_view::database_view_plugin::DatabaseViewPluginRegistry;
 use gpui::*;
@@ -22,7 +22,7 @@ fn main() {
     let app = Application::new().with_assets(Assets);
 
     app.run(move |cx| {
-        onetcli_app::init(cx);
+        pig_app::init(cx);
         settings::setting_tab::init_settings(cx);
         // Initialize global database state
         let db_state = GlobalDbState::new();
@@ -72,7 +72,7 @@ fn main() {
                 }
 
                 update::schedule_update_check(window, cx);
-                let view = cx.new(|cx| OnetCliApp::new(window, cx));
+                let view = cx.new(|cx| PigApp::new(window, cx));
                 cx.new(|cx| Root::new(view, window, cx))
             })?;
 

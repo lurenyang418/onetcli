@@ -599,7 +599,7 @@ where
 
 fn build_download_path(version: &str, download_url: &str) -> Result<PathBuf, String> {
     let file_name = download_file_name(version, download_url);
-    let dir = std::env::temp_dir().join("onetcli-update");
+    let dir = std::env::temp_dir().join("pig-update");
     Ok(dir.join(file_name))
 }
 
@@ -621,7 +621,7 @@ fn download_file_name(version: &str, download_url: &str) -> String {
             String::new()
         });
 
-    let base_name = format!("onetcli-update-{}", version.replace('/', "-"));
+    let base_name = format!("pig-update-{}", version.replace('/', "-"));
     if extension.is_empty() {
         base_name
     } else {

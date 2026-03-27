@@ -30,8 +30,8 @@ impl ProviderManager {
         }
 
         let provider: Arc<dyn LlmProvider> = match config.provider_type {
-            ProviderType::OnetCli => {
-                anyhow::bail!("OnetCli provider is not supported")
+            ProviderType::Pig => {
+                anyhow::bail!("Pig provider is not supported")
             }
             _ => {
                 let connector = LlmConnector::from_config(config)?;

@@ -78,9 +78,9 @@ Home:
     zh-CN: 点击上方按钮新建连接
     zh-HK: 點擊上方按鈕新建連線
   welcome:
-    en: Welcome to OnetCli
-    zh-CN: 欢迎使用 OnetCli
-    zh-HK: 歡迎使用 OnetCli
+    en: Welcome to Pig
+    zh-CN: 欢迎使用 Pig
+    zh-HK: 歡迎使用 Pig
   welcome_hint:
     en: Select a connection from the sidebar to view details
     zh-CN: 从侧边栏选择一个连接查看详情

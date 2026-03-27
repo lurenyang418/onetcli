@@ -13,7 +13,7 @@ pub enum ProviderType {
     Google,
     AzureOpenAI,
     OpenAICompatible,
-    OnetCli,
+    Pig,
 }
 
 impl ProviderType {
@@ -30,7 +30,7 @@ impl ProviderType {
             ProviderType::Google => "google",
             ProviderType::AzureOpenAI => "azure_openai",
             ProviderType::OpenAICompatible => "openai_compatible",
-            ProviderType::OnetCli => "onet_cli",
+            ProviderType::Pig => "pig",
         }
     }
 
@@ -47,7 +47,7 @@ impl ProviderType {
             "google" => Some(ProviderType::Google),
             "azure_openai" => Some(ProviderType::AzureOpenAI),
             "openai_compatible" => Some(ProviderType::OpenAICompatible),
-            "onet_cli" => Some(ProviderType::OnetCli),
+            "pig" => Some(ProviderType::Pig),
             _ => None,
         }
     }
@@ -65,7 +65,7 @@ impl ProviderType {
             ProviderType::Google => "Google (Gemini)",
             ProviderType::AzureOpenAI => "Azure OpenAI",
             ProviderType::OpenAICompatible => "OpenAI Compatible",
-            ProviderType::OnetCli => "Onet CLI",
+            ProviderType::Pig => "Pig",
         }
     }
 
@@ -82,12 +82,12 @@ impl ProviderType {
             ProviderType::Google,
             ProviderType::AzureOpenAI,
             ProviderType::OpenAICompatible,
-            ProviderType::OnetCli,
+            ProviderType::Pig,
         ]
     }
 
     pub fn requires_api_key(&self) -> bool {
-        !matches!(self, ProviderType::Ollama | ProviderType::OnetCli)
+        !matches!(self, ProviderType::Ollama | ProviderType::Pig)
     }
 
     /// 是否为内置 provider（不需要用户配置）
