@@ -40,7 +40,8 @@ pub fn init(cx: &mut App) {
 }
 
 const PANEL_MIN_SIZE: Pixels = px(100.0);
-const TREE_PANEL_DEFAULT_SIZE: Pixels = px(250.0);
+const PANEL_MAX_RATIO: f32 = 0.40; // 最多占40%宽度
+const TREE_PANEL_DEFAULT_RATIO: f32 = 0.22; // 默认占22%宽度
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResizingPanel {
@@ -57,6 +58,7 @@ pub struct DatabaseTabView {
     workspace: Option<Workspace>,
     focus_handle: FocusHandle,
     tree_panel_size: Pixels,
+    user_has_resized: bool, // 用户是否手动调整过宽度
     resizing: Option<ResizingPanel>,
     bounds: Bounds<Pixels>,
 }
@@ -182,7 +184,8 @@ impl DatabaseTabView {
             _event_handler: event_handler,
             workspace,
             focus_handle: cx.focus_handle(),
-            tree_panel_size: TREE_PANEL_DEFAULT_SIZE,
+            tree_panel_size: px(0.0), // 临时值，会在 prepaint 中根据比例计算
+            user_has_resized: false,
             resizing: None,
             bounds: Bounds::default(),
         }
@@ -234,6 +237,7 @@ impl DatabaseTabView {
                 let new_size = mouse_position.x - self.bounds.left();
                 let max_size = (available_width - PANEL_MIN_SIZE).max(PANEL_MIN_SIZE);
                 self.tree_panel_size = new_size.clamp(PANEL_MIN_SIZE, max_size);
+                self.user_has_resized = true;
             }
         }
 
@@ -534,6 +538,18 @@ impl Element for ResizeEventHandler {
                 origin: Point::default(),
                 size: bounds.size,
             };
+
+            let available_width = bounds.size.width;
+            if available_width <= px(0.0) {
+                return;
+            }
+
+            // 只有用户未手动调整过时，才使用比例计算
+            if !view.user_has_resized {
+                let max_size = available_width * PANEL_MAX_RATIO;
+                let default_size = available_width * TREE_PANEL_DEFAULT_RATIO;
+                view.tree_panel_size = default_size.clamp(PANEL_MIN_SIZE, max_size);
+            }
         });
     }
 

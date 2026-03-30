@@ -243,6 +243,8 @@ pub struct DataGrid {
     filter_editor: Entity<TableFilterEditor>,
     /// 过滤器事件订阅
     _filter_sub: Option<Subscription>,
+    /// 当前排序子句（由表头点击设置）
+    order_by_clause: SharedString,
 }
 
 impl DataGrid {
@@ -274,6 +276,7 @@ impl DataGrid {
             table_data_info,
             filter_editor,
             _filter_sub: None,
+            order_by_clause: SharedString::new(""),
         };
         result.bind_table_event(window, cx);
         if is_table_data {
@@ -408,9 +411,7 @@ impl DataGrid {
             }
         };
 
-        self.filter_editor.update(cx, |editor, cx| {
-            editor.set_order_by_clause(order_by_clause.clone(), window, cx);
-        });
+        self.order_by_clause = order_by_clause.into();
 
         self.load_data_with_clauses(1, cx);
     }
@@ -426,7 +427,7 @@ impl DataGrid {
         let table = self.table.clone();
         let table_data_info = self.table_data_info.clone();
         let where_clause = self.filter_editor.read(cx).get_where_clause(cx);
-        let order_by_clause = self.filter_editor.read(cx).get_order_by_clause(cx);
+        let order_by_clause = self.order_by_clause.to_string();
         let filter_editor = self.filter_editor.clone();
         let page_size = self.table_data_info.read(cx).page_size;
 
@@ -681,7 +682,7 @@ impl DataGrid {
         let current_page = self.table_data_info.read(cx).current_page;
         let total_count = self.table_data_info.read(cx).total_count;
         let where_clause = self.filter_editor.read(cx).get_where_clause(cx);
-        let order_by_clause = self.filter_editor.read(cx).get_order_by_clause(cx);
+        let order_by_clause = self.order_by_clause.to_string();
         let table = self.table.clone();
         let metadata = self.table.read(cx).delegate().get_table_metadata();
         let window_id = cx.active_window();
@@ -2508,6 +2509,7 @@ impl Clone for DataGrid {
             table_data_info: self.table_data_info.clone(),
             filter_editor: self.filter_editor.clone(),
             _filter_sub: None,
+            order_by_clause: self.order_by_clause.clone(),
         }
     }
 }

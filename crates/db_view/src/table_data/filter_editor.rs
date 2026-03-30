@@ -1,709 +1,714 @@
-use std::rc::Rc;
-
-use anyhow::Result;
-use db::ColumnInfo;
+use db::{ColumnInfo, FieldType, FilterOperator};
 use gpui::{
-    App, AppContext, Context, Entity, EventEmitter, IntoElement, Render, Styled as _, Subscription,
-    Task, Window,
+    prelude::*, px, App, AppContext, ClickEvent, Context, Entity, EventEmitter, IntoElement,
+    Render, SharedString, Styled, Subscription, Window,
 };
-use gpui_component::highlighter::Language;
-use gpui_component::input::{CompletionProvider, Input, InputEvent, InputState};
-use gpui_component::{ActiveTheme, Rope, RopeExt};
-use lsp_types::{
-    CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse, CompletionTextEdit,
-    Documentation, InsertReplaceEdit, Range,
-};
+use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState};
+use gpui_component::{ActiveTheme, Disableable, IconName, Sizable};
 
 #[derive(Clone)]
 pub struct TableSchema {
     pub columns: Vec<ColumnInfo>,
 }
 
-// Completion provider for WHERE clause
-#[derive(Clone)]
-pub struct WhereCompletionProvider {
-    schema: TableSchema,
+// ============================================================================
+// 字段选择项（用于 Select 组件）
+// ============================================================================
+
+#[derive(Clone, Debug)]
+pub struct ColumnSelectItem {
+    pub column: ColumnInfo,
 }
 
-impl WhereCompletionProvider {
-    pub fn new(schema: TableSchema) -> Self {
-        Self { schema }
+impl SelectItem for ColumnSelectItem {
+    type Value = String;
+
+    fn title(&self) -> SharedString {
+        self.column.name.clone().into()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.column.name
+    }
+
+    fn matches(&self, query: &str) -> bool {
+        self.column
+            .name
+            .to_lowercase()
+            .contains(&query.to_lowercase())
     }
 }
 
-/// 获取当前正在输入的 token
-fn extract_current_word(rope: &Rope, offset: usize) -> (String, usize) {
-    let mut start = offset;
-    while start > 0 {
-        let ch = rope.char(start - 1);
-        if !(ch.is_alphanumeric() || ch == '_' || ch == '.') {
-            break;
+// ============================================================================
+// 操作符选择项（用于 Select 组件）
+// ============================================================================
+
+#[derive(Clone, Debug)]
+pub struct OperatorSelectItem {
+    pub operator: FilterOperator,
+    pub label: &'static str,
+}
+
+impl SelectItem for OperatorSelectItem {
+    type Value = FilterOperator;
+
+    fn title(&self) -> SharedString {
+        self.label.into()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.operator
+    }
+
+    fn matches(&self, query: &str) -> bool {
+        self.label.to_lowercase().contains(&query.to_lowercase())
+    }
+}
+
+// ============================================================================
+// 值输入模式
+// ============================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValueInputMode {
+    SingleValue, // =, !=, >, <, >=, <=, LIKE
+    DualValue,   // BETWEEN（两个输入框）
+    ListValue,   // IN, NOT IN（逗号分隔）
+    NoValue,     // IS NULL, IS NOT NULL
+}
+
+impl ValueInputMode {
+    pub fn from_operator(op: FilterOperator) -> Self {
+        match op {
+            FilterOperator::In | FilterOperator::NotIn => ValueInputMode::ListValue,
+            FilterOperator::IsNull | FilterOperator::IsNotNull => ValueInputMode::NoValue,
+            FilterOperator::Between => ValueInputMode::DualValue,
+            FilterOperator::IsTrue | FilterOperator::IsFalse => ValueInputMode::NoValue,
+            _ => ValueInputMode::SingleValue,
         }
-        start -= 1;
     }
-    (rope.slice(start..offset).to_string().to_uppercase(), start)
 }
 
-/// 检测光标是否在字符串内部（单引号或双引号）
-fn is_inside_string(rope: &Rope, offset: usize) -> bool {
-    let text = rope.slice(0..offset).to_string();
-    let mut in_single_quote = false;
-    let mut in_double_quote = false;
-    let mut prev_char = '\0';
+// ============================================================================
+// 根据字段类型获取可用操作符
+// ============================================================================
 
-    for ch in text.chars() {
-        // 跳过转义的引号
-        if prev_char == '\\' {
-            prev_char = ch;
-            continue;
-        }
-
-        match ch {
-            '\'' if !in_double_quote => in_single_quote = !in_single_quote,
-            '"' if !in_single_quote => in_double_quote = !in_double_quote,
-            _ => {}
-        }
-        prev_char = ch;
+fn get_operators_for_field_type(field_type: FieldType) -> Vec<OperatorSelectItem> {
+    match field_type {
+        FieldType::Text | FieldType::LongText => vec![
+            OperatorSelectItem {
+                operator: FilterOperator::Like,
+                label: "LIKE",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::NotLike,
+                label: "NOT LIKE",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::Equal,
+                label: "=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::NotEqual,
+                label: "!=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::In,
+                label: "IN",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::NotIn,
+                label: "NOT IN",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsNull,
+                label: "IS NULL",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsNotNull,
+                label: "IS NOT NULL",
+            },
+        ],
+        FieldType::Integer | FieldType::Decimal => vec![
+            OperatorSelectItem {
+                operator: FilterOperator::Equal,
+                label: "=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::NotEqual,
+                label: "!=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::GreaterThan,
+                label: ">",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::LessThan,
+                label: "<",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::GreaterOrEqual,
+                label: ">=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::LessOrEqual,
+                label: "<=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::Between,
+                label: "BETWEEN",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::In,
+                label: "IN",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::NotIn,
+                label: "NOT IN",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsNull,
+                label: "IS NULL",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsNotNull,
+                label: "IS NOT NULL",
+            },
+        ],
+        FieldType::Date | FieldType::Time | FieldType::DateTime => vec![
+            OperatorSelectItem {
+                operator: FilterOperator::Equal,
+                label: "=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::NotEqual,
+                label: "!=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::GreaterThan,
+                label: ">",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::LessThan,
+                label: "<",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::GreaterOrEqual,
+                label: ">=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::LessOrEqual,
+                label: "<=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::Between,
+                label: "BETWEEN",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsNull,
+                label: "IS NULL",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsNotNull,
+                label: "IS NOT NULL",
+            },
+        ],
+        FieldType::Boolean => vec![
+            OperatorSelectItem {
+                operator: FilterOperator::IsTrue,
+                label: "TRUE",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsFalse,
+                label: "FALSE",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsNull,
+                label: "IS NULL",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsNotNull,
+                label: "IS NOT NULL",
+            },
+        ],
+        _ => vec![
+            OperatorSelectItem {
+                operator: FilterOperator::Equal,
+                label: "=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::NotEqual,
+                label: "!=",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsNull,
+                label: "IS NULL",
+            },
+            OperatorSelectItem {
+                operator: FilterOperator::IsNotNull,
+                label: "IS NOT NULL",
+            },
+        ],
     }
-
-    in_single_quote || in_double_quote
 }
 
-/// 获取当前 token 前的最近有效 token（作为上下文）
-fn get_last_token_before(rope: &Rope, offset: usize) -> Option<String> {
-    if offset == 0 {
-        return None;
-    }
+// ============================================================================
+// 条件行状态
+// ============================================================================
 
-    let mut idx = offset;
-    while idx > 0 && rope.char(idx - 1).is_whitespace() {
-        idx -= 1;
-    }
-    if idx == 0 {
-        return None;
-    }
-
-    let mut token_start = idx;
-    while token_start > 0 {
-        let ch = rope.char(token_start - 1);
-        if !(ch.is_alphanumeric() || ch == '_' || ch == '.') {
-            break;
-        }
-        token_start -= 1;
-    }
-    let token = rope.slice(token_start..idx).to_string();
-    if token.is_empty() { None } else { Some(token) }
+struct FilterRowState {
+    row_id: u64,
+    column_select: Entity<SelectState<SearchableVec<ColumnSelectItem>>>,
+    operator_select: Entity<SelectState<SearchableVec<OperatorSelectItem>>>,
+    value_input: Entity<InputState>,
+    value2_input: Entity<InputState>,
+    current_input_mode: ValueInputMode,
+    subscriptions: Vec<Subscription>,
 }
 
-/// 智能建议生成
-fn suggest_items(
-    schema: &TableSchema,
-    current_word: &str,
-    last_token: Option<&str>,
-    replace_range: Range,
-    full_text: &str,
-) -> Vec<CompletionItem> {
-    let mut items = Vec::new();
-    let after_column = last_token.and_then(|t| {
-        schema
+impl FilterRowState {
+    fn new(
+        row_id: u64,
+        schema: &TableSchema,
+        window: &mut Window,
+        cx: &mut Context<TableFilterEditor>,
+    ) -> Self {
+        let column_items: Vec<ColumnSelectItem> = schema
             .columns
             .iter()
-            .find(|c| c.name.eq_ignore_ascii_case(t))
-    });
+            .map(|col| ColumnSelectItem {
+                column: col.clone(),
+            })
+            .collect();
 
-    // 检测上下文：是否在操作符后面（需要值提示）
-    let after_operator = last_token
-        .map(|t| {
-            let upper = t.to_uppercase();
-            matches!(
-                upper.as_str(),
-                "=" | "!=" | ">" | "<" | ">=" | "<=" | "LIKE" | "IN"
-            )
-        })
-        .unwrap_or(false);
+        let column_select = cx.new(|cx| {
+            SelectState::new(SearchableVec::new(column_items), None, window, cx).searchable(true)
+        });
 
-    // 1️⃣ 如果在操作符后面，优先提示值的模板
-    if after_operator {
-        suggest_value_templates(current_word, replace_range, &mut items);
-    }
+        let operator_select =
+            cx.new(|cx| SelectState::new(SearchableVec::new(Vec::new()), None, window, cx));
 
-    // 2️⃣ 如果上一个 token 是列名 → 推操作符
-    if let Some(col) = after_column {
-        suggest_operators(col, current_word, replace_range, &mut items);
-    } else {
-        // 3️⃣ 否则提示列名
-        suggest_columns(schema, current_word, replace_range, &mut items);
-    }
+        let value_input = cx.new(|cx| InputState::new(window, cx));
 
-    // 4️⃣ 如果已有条件 → AND / OR 优先
-    if has_complete_condition(full_text) {
-        add_logic_keywords(current_word, replace_range, &mut items);
-    }
+        let value2_input = cx.new(|cx| InputState::new(window, cx));
 
-    // 5️⃣ SQL 函数智能提示
-    suggest_functions(current_word, replace_range, &mut items);
-
-    // 全局排序（值模板 > 操作符 > 字段 > 逻辑关键词 > 函数）
-    items.sort_by_key(|x| x.sort_text.clone().unwrap_or("9".into()));
-    items
-}
-
-/// 提示值的模板（字符串、数字、NULL 等）
-fn suggest_value_templates(current_word: &str, range: Range, items: &mut Vec<CompletionItem>) {
-    let templates = [
-        ("'...'", "''", "String value"),
-        ("NULL", "NULL", "NULL value"),
-        ("true", "true", "Boolean true"),
-        ("false", "false", "Boolean false"),
-    ];
-
-    for (label, text, doc) in &templates {
-        if label
-            .to_uppercase()
-            .starts_with(&current_word.to_uppercase())
-            || current_word.is_empty()
-        {
-            items.push(CompletionItem {
-                label: label.to_string(),
-                kind: Some(CompletionItemKind::VALUE),
-                documentation: Some(Documentation::String(doc.to_string())),
-                text_edit: Some(insert_replace(text, range)),
-                sort_text: Some("0_VALUE".into()),
-                ..Default::default()
-            });
+        Self {
+            row_id,
+            column_select,
+            operator_select,
+            value_input,
+            value2_input,
+            current_input_mode: ValueInputMode::SingleValue,
+            subscriptions: Vec::new(),
         }
     }
-}
 
-/// 检测是否已有完整条件（简单检测：包含操作符）
-fn has_complete_condition(text: &str) -> bool {
-    let upper = text.to_uppercase();
-    upper.contains('=')
-        || upper.contains('>')
-        || upper.contains('<')
-        || upper.contains("LIKE")
-        || upper.contains("IN")
-        || upper.contains("BETWEEN")
-}
-
-fn suggest_columns(
-    schema: &TableSchema,
-    current_word: &str,
-    replace_range: Range,
-    items: &mut Vec<CompletionItem>,
-) {
-    for col in &schema.columns {
-        if col.name.to_uppercase().starts_with(current_word) || current_word.is_empty() {
-            let detail = if col.is_nullable {
-                format!("{} (nullable)", col.data_type)
-            } else {
-                format!("{} (not null)", col.data_type)
-            };
-
-            items.push(CompletionItem {
-                label: col.name.clone(),
-                kind: Some(CompletionItemKind::FIELD),
-                detail: Some(detail),
-                documentation: Some(Documentation::String(format!(
-                    "Column: {}\nType: {}\nNullable: {}",
-                    col.name, col.data_type, col.is_nullable
-                ))),
-                sort_text: Some("2_COLUMN".into()),
-                text_edit: Some(insert_replace(&col.name, replace_range)),
-                ..Default::default()
-            });
-        }
+    /// 清除值输入框
+    fn clear_value(&self, window: &mut Window, cx: &mut Context<TableFilterEditor>) {
+        self.value_input.update(cx, |state, cx| {
+            state.set_value("".to_string(), window, cx);
+        });
+        self.value2_input.update(cx, |state, cx| {
+            state.set_value("".to_string(), window, cx);
+        });
     }
-}
 
-/// 操作符智能提示（增强 LIKE、IN、BETWEEN 的结构补全）
-fn suggest_operators(
-    col: &ColumnInfo,
-    current_word: &str,
-    range: Range,
-    items: &mut Vec<CompletionItem>,
-) {
-    let dt = col.data_type.to_uppercase();
+    /// 设置指定列的操作符列表
+    fn update_operators_for_column(
+        &self,
+        column: &ColumnInfo,
+        window: &mut Window,
+        cx: &mut Context<TableFilterEditor>,
+    ) {
+        use gpui_component::IndexPath;
 
-    // 不使用 snippet 语法，直接插入简洁模板
-    // 光标会定位在插入文本末尾，用户可以直接输入
-    let ops: Vec<(&str, &str, &str)> =
-        if dt.contains("CHAR") || dt.contains("TEXT") || dt.contains("VARCHAR") {
-            vec![
-                ("= ''", "= ''", "Equal to"),
-                ("!= ''", "!= ''", "Not equal to"),
-                ("LIKE '%%'", "LIKE '%%'", "Pattern match (contains)"),
-                ("LIKE '%'", "LIKE '%'", "Pattern match (starts with)"),
-                ("IN ()", "IN ()", "In list"),
-                ("IS NULL", "IS NULL", "Is null"),
-                ("IS NOT NULL", "IS NOT NULL", "Is not null"),
-            ]
-        } else if dt.contains("INT")
-            || dt.contains("DECIMAL")
-            || dt.contains("FLOAT")
-            || dt.contains("DOUBLE")
-            || dt.contains("NUMERIC")
-        {
-            vec![
-                ("=", "= ", "Equal to"),
-                ("!=", "!= ", "Not equal to"),
-                ("<", "< ", "Less than"),
-                (">", "> ", "Greater than"),
-                ("<=", "<= ", "Less than or equal"),
-                (">=", ">= ", "Greater than or equal"),
-                ("BETWEEN", "BETWEEN  AND ", "Between range"),
-                ("IN ()", "IN ()", "In list"),
-                ("IS NULL", "IS NULL", "Is null"),
-                ("IS NOT NULL", "IS NOT NULL", "Is not null"),
-            ]
-        } else if dt.contains("DATE") || dt.contains("TIME") {
-            vec![
-                ("= ''", "= ''", "Equal to"),
-                ("!= ''", "!= ''", "Not equal to"),
-                ("< ''", "< ''", "Before"),
-                ("> ''", "> ''", "After"),
-                ("BETWEEN '' AND ''", "BETWEEN '' AND ''", "Between dates"),
-                ("IS NULL", "IS NULL", "Is null"),
-                ("IS NOT NULL", "IS NOT NULL", "Is not null"),
-            ]
-        } else {
-            vec![
-                ("=", "= ", "Equal to"),
-                ("!=", "!= ", "Not equal to"),
-                ("IS NULL", "IS NULL", "Is null"),
-                ("IS NOT NULL", "IS NOT NULL", "Is not null"),
-            ]
-        };
-
-    for (label, text, doc) in ops {
-        if !current_word.is_empty()
-            && !label
-                .to_uppercase()
-                .starts_with(&current_word.to_uppercase())
-        {
-            continue;
-        }
-
-        items.push(CompletionItem {
-            label: label.to_string(),
-            kind: Some(CompletionItemKind::OPERATOR),
-            detail: Some(format!("{} ({})", doc, col.data_type)),
-            documentation: Some(Documentation::String(format!(
-                "{}\n\nColumn: {} ({})",
-                doc, col.name, col.data_type
-            ))),
-            text_edit: Some(insert_replace(text, range)),
-            sort_text: Some("1_OPERATOR".into()),
-            ..Default::default()
+        let field_type = FieldType::from_db_type(&column.data_type);
+        let operators = get_operators_for_field_type(field_type);
+        self.operator_select.update(cx, |state, cx| {
+            state.set_items(SearchableVec::new(operators), window, cx);
+            // 重置选择为第一个可用操作符
+            state.set_selected_index(Some(IndexPath::new(0)), window, cx);
         });
     }
 }
 
-/// 逻辑关键词
-fn add_logic_keywords(current_word: &str, range: Range, items: &mut Vec<CompletionItem>) {
-    let keywords = [
-        ("AND", "AND ", "Logical AND - both conditions must be true"),
-        (
-            "OR",
-            "OR ",
-            "Logical OR - at least one condition must be true",
-        ),
-    ];
-
-    for (label, snippet, doc) in &keywords {
-        if label.starts_with(&current_word.to_uppercase()) || current_word.is_empty() {
-            items.push(CompletionItem {
-                label: label.to_string(),
-                kind: Some(CompletionItemKind::KEYWORD),
-                documentation: Some(Documentation::String(doc.to_string())),
-                text_edit: Some(insert_replace(snippet, range)),
-                sort_text: Some("3_LOGIC".into()),
-                ..Default::default()
-            });
-        }
-    }
-}
-
-/// SQL 函数智能提示
-fn suggest_functions(current_word: &str, range: Range, items: &mut Vec<CompletionItem>) {
-    // 不使用 snippet 语法，光标定位在括号内
-    let fns = [
-        ("UPPER()", "UPPER()", "Convert to uppercase", "String"),
-        ("LOWER()", "LOWER()", "Convert to lowercase", "String"),
-        ("LENGTH()", "LENGTH()", "Get string length", "String"),
-        ("TRIM()", "TRIM()", "Remove spaces", "String"),
-        ("CONCAT()", "CONCAT(, )", "Concatenate strings", "String"),
-        (
-            "SUBSTRING()",
-            "SUBSTRING(, , )",
-            "Extract substring",
-            "String",
-        ),
-        ("DATE()", "DATE()", "Extract date part", "Date"),
-        ("YEAR()", "YEAR()", "Extract year", "Date"),
-        ("MONTH()", "MONTH()", "Extract month", "Date"),
-        ("DAY()", "DAY()", "Extract day", "Date"),
-        ("NOW()", "NOW()", "Current timestamp", "Date"),
-        ("COALESCE()", "COALESCE(, )", "First non-null", "Utility"),
-        ("CAST()", "CAST( AS )", "Convert type", "Utility"),
-    ];
-
-    for (label, text, doc, category) in &fns {
-        if label
-            .to_uppercase()
-            .starts_with(&current_word.to_uppercase())
-            || current_word.is_empty()
-        {
-            items.push(CompletionItem {
-                label: label.to_string(),
-                kind: Some(CompletionItemKind::FUNCTION),
-                detail: Some(category.to_string()),
-                documentation: Some(Documentation::String(doc.to_string())),
-                text_edit: Some(insert_replace(text, range)),
-                sort_text: Some("4_FUNCTION".into()),
-                ..Default::default()
-            });
-        }
-    }
-}
-
-/// 工具方法
-fn insert_replace(text: &str, range: Range) -> CompletionTextEdit {
-    CompletionTextEdit::InsertAndReplace(InsertReplaceEdit {
-        new_text: text.into(),
-        insert: range,
-        replace: range,
-    })
-}
-
-impl CompletionProvider for WhereCompletionProvider {
-    fn completions(
-        &self,
-        rope: &Rope,
-        offset: usize,
-        _trigger: CompletionContext,
-        _window: &mut Window,
-        cx: &mut Context<InputState>,
-    ) -> Task<Result<CompletionResponse>> {
-        let rope = rope.clone();
-        let schema = self.schema.clone();
-
-        cx.background_spawn(async move {
-            // 如果在字符串内部，不提供自动完成
-            if is_inside_string(&rope, offset) {
-                return Ok(CompletionResponse::Array(vec![]));
-            }
-
-            // 获取当前 token
-            let (current_word, start_offset) = extract_current_word(&rope, offset);
-
-            let start_pos = rope.offset_to_position(start_offset);
-            let end_pos = rope.offset_to_position(offset);
-            let replace_range = Range::new(start_pos, end_pos);
-
-            let last_token = get_last_token_before(&rope, start_offset);
-            let full_text = rope.to_string();
-
-            let items = suggest_items(
-                &schema,
-                current_word.as_str(),
-                last_token.as_deref(),
-                replace_range,
-                &full_text,
-            );
-
-            Ok(CompletionResponse::Array(items))
-        })
-    }
-
-    fn is_completion_trigger(
-        &self,
-        _offset: usize,
-        new_text: &str,
-        _cx: &mut Context<InputState>,
-    ) -> bool {
-        // 触发自动完成的条件：
-        // 1. 空格、点、操作符后
-        // 2. 输入字母、数字、下划线时
-        // 注意：不在引号输入时触发，因为字符串内部不需要自动完成
-        matches!(new_text, " " | "." | "=" | ">" | "<" | "!" | "(")
-            || new_text
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_alphanumeric() || c == '_')
-    }
-}
-// Completion provider for ORDER BY clause
-#[derive(Clone)]
-pub struct OrderByCompletionProvider {
-    schema: TableSchema,
-}
-
-impl OrderByCompletionProvider {
-    pub fn new(schema: TableSchema) -> Self {
-        Self { schema }
-    }
-}
-
-impl CompletionProvider for OrderByCompletionProvider {
-    fn completions(
-        &self,
-        rope: &Rope,
-        offset: usize,
-        _trigger: CompletionContext,
-        _window: &mut Window,
-        cx: &mut Context<InputState>,
-    ) -> Task<Result<CompletionResponse>> {
-        let rope = rope.clone();
-        let schema = self.schema.clone();
-
-        cx.background_spawn(async move {
-            // 如果在字符串内部，不提供自动完成
-            if is_inside_string(&rope, offset) {
-                return Ok(CompletionResponse::Array(vec![]));
-            }
-
-            // 获取当前 token
-            let (current_word, start_offset) = extract_current_word(&rope, offset);
-
-            let start_pos = rope.offset_to_position(start_offset);
-            let end_pos = rope.offset_to_position(offset);
-            let replace_range = Range::new(start_pos, end_pos);
-            let mut items = Vec::new();
-            let last_token = get_last_token_before(&rope, start_offset);
-            let after_column = last_token.clone().and_then(|t| {
-                schema
-                    .columns
-                    .iter()
-                    .find(|c| c.name.eq_ignore_ascii_case(&t))
-            });
-
-            // 如果 ORDER BY 后面已有字段，就优先提示 ASC / DESC
-            if after_column.is_some() {
-                // 补 ASC / DESC
-                for (kw, doc) in &[("ASC", "Ascending"), ("DESC", "Descending")] {
-                    items.push(CompletionItem {
-                        label: kw.to_string(),
-                        kind: Some(CompletionItemKind::KEYWORD),
-                        text_edit: Some(CompletionTextEdit::InsertAndReplace(InsertReplaceEdit {
-                            new_text: kw.to_string(),
-                            insert: replace_range,
-                            replace: replace_range,
-                        })),
-                        documentation: Some(Documentation::String(doc.to_string())),
-                        sort_text: Some("0_ORDER_DIR".into()),
-                        ..Default::default()
-                    });
-                }
-            }
-
-            let is_sort = last_token
-                .as_ref()
-                .map(|t| {
-                    let upper = t.to_uppercase();
-                    upper == "ASC" || upper == "DESC"
-                })
-                .unwrap_or(false);
-
-            if is_sort {
-                // 提示继续排序，补 ", <column>"
-                for col in &schema.columns {
-                    let text = format!(", {}", col.name);
-                    items.push(CompletionItem {
-                        label: text.clone(),
-                        kind: Some(CompletionItemKind::FIELD),
-                        text_edit: Some(insert_replace(&text, replace_range)),
-                        sort_text: Some("1_ORDER_NEXT".into()),
-                        detail: Some("Next ordering field".into()),
-                        ..Default::default()
-                    });
-                }
-            } else {
-                suggest_columns(&schema, &current_word, replace_range, &mut items);
-            }
-
-            Ok(CompletionResponse::Array(items))
-        })
-    }
-
-    fn is_completion_trigger(
-        &self,
-        _offset: usize,
-        new_text: &str,
-        _cx: &mut Context<InputState>,
-    ) -> bool {
-        // Trigger completion on space, dot, comma, or when typing letters/numbers/underscore
-        matches!(new_text, " " | "." | ",")
-            || new_text
-                .chars()
-                .next()
-                .map_or(false, |c| c.is_alphabetic() || c == '_')
-    }
-}
+// ============================================================================
+// 事件定义
+// ============================================================================
 
 pub enum FilterEditorEvent {
     QueryApply,
 }
 
-pub struct SimpleCodeEditor {
-    editor: Entity<InputState>,
-    _sub: Subscription,
-}
+// ============================================================================
+// 可视化 WHERE 条件构建器
+// ============================================================================
 
-impl SimpleCodeEditor {
-    pub fn new(editor: Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let _sub = cx.subscribe_in(&editor, window, |_, _, event: &InputEvent, _, cx| {
-            if let InputEvent::PressEnter { .. } = event {
-                cx.emit(FilterEditorEvent::QueryApply);
-            }
-        });
-        Self { editor, _sub }
-    }
-
-    pub fn get_text_from_app(&self, app_cx: &App) -> String {
-        self.editor.read(app_cx).text().to_string()
-    }
-}
-
-impl EventEmitter<FilterEditorEvent> for SimpleCodeEditor {}
-
-impl Render for SimpleCodeEditor {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        Input::new(&self.editor).cleanable(true).size_full()
-    }
-}
-
-pub fn create_simple_editor(
-    window: &mut Window,
-    cx: &mut Context<SimpleCodeEditor>,
-) -> SimpleCodeEditor {
-    let editor = cx.new(|cx| {
-        let editor = InputState::new(window, cx)
-            .code_editor(Language::from_str("sql"))
-            .multi_line(false)
-            .clean_on_escape();
-
-        editor
-    });
-
-    SimpleCodeEditor::new(editor, window, cx)
-}
-
-// A combined component for table filtering that includes both WHERE and ORDER BY editors
 pub struct TableFilterEditor {
-    where_editor: Entity<SimpleCodeEditor>,
-    order_by_editor: Entity<SimpleCodeEditor>,
+    condition_rows: Vec<FilterRowState>,
+    schema: TableSchema,
+    next_row_id: u64,
+    needs_init: bool,
     _subs: Vec<Subscription>,
 }
 
 impl TableFilterEditor {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let where_editor = cx.new(|cx| create_simple_editor(window, cx));
-        let order_by_editor = cx.new(|cx| create_simple_editor(window, cx));
-        let where_sub = cx.subscribe_in(
-            &where_editor,
-            window,
-            |_, _, evt: &FilterEditorEvent, _, cx| match evt {
-                FilterEditorEvent::QueryApply => {
-                    cx.emit(FilterEditorEvent::QueryApply);
-                }
-            },
-        );
-        let order_by_sub = cx.subscribe_in(
-            &order_by_editor,
-            window,
-            |_, _, evt: &FilterEditorEvent, _, cx| match evt {
-                FilterEditorEvent::QueryApply => {
-                    cx.emit(FilterEditorEvent::QueryApply);
-                }
-            },
-        );
-
+    pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
         Self {
-            where_editor,
-            order_by_editor,
-            _subs: vec![where_sub, order_by_sub],
+            condition_rows: Vec::new(),
+            schema: TableSchema {
+                columns: Vec::new(),
+            },
+            next_row_id: 1,
+            needs_init: false,
+            _subs: Vec::new(),
         }
     }
 
-    pub fn get_where_clause(&self, cx: &App) -> String {
-        self.where_editor.read(cx).get_text_from_app(cx)
+    /// 添加新条件行
+    fn add_condition_row(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let row_id = self.next_row_id;
+        self.next_row_id += 1;
+
+        let row = FilterRowState::new(row_id, &self.schema, window, cx);
+        self.condition_rows.push(row);
+        self.setup_row_subscriptions(row_id, window, cx);
     }
 
-    pub fn get_order_by_clause(&self, cx: &App) -> String {
-        self.order_by_editor.read(cx).get_text_from_app(cx)
+    /// 删除条件行（至少保留一行），删除后触发查询
+    fn remove_condition_row(&mut self, row_id: u64, cx: &mut Context<Self>) {
+        if self.condition_rows.len() > 1 {
+            self.condition_rows.retain(|r| r.row_id != row_id);
+            cx.emit(FilterEditorEvent::QueryApply);
+        }
     }
 
-    pub fn set_order_by_clause(
+    /// 设置行的事件订阅
+    fn setup_row_subscriptions(
         &mut self,
-        clause: impl Into<String>,
+        row_id: u64,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let clause = clause.into();
-        self.order_by_editor.update(cx, |editor, cx| {
-            editor.editor.update(cx, |input_state, cx| {
-                input_state.set_value(clause.clone(), window, cx);
-            });
-        });
+        // 找到这个行
+        let row = self.condition_rows.iter_mut().find(|r| r.row_id == row_id);
+        let Some(row) = row else { return };
+
+        // 订阅字段选择事件
+        let row_id_for_column = row_id;
+        let schema = self.schema.clone();
+        let sub = cx.subscribe_in(
+            &row.column_select,
+            window,
+            move |this, _, event, window, cx| {
+                if let SelectEvent::Confirm(Some(column_name)) = event {
+                    let row = this.condition_rows.iter_mut().find(|r| r.row_id == row_id_for_column);
+                    let Some(row) = row else { return };
+                    let column = schema.columns.iter().find(|c| c.name == *column_name);
+                    let Some(column) = column else { return };
+                    let field_type = FieldType::from_db_type(&column.data_type);
+                    let operators = get_operators_for_field_type(field_type);
+                    // 先获取第一个操作符的 input_mode
+                    let first_input_mode = operators.first().map(|op| ValueInputMode::from_operator(op.operator));
+                    row.operator_select.update(cx, |state, cx| {
+                        state.set_items(SearchableVec::new(operators), window, cx);
+                        state.set_selected_index(Some(gpui_component::IndexPath::new(0)), window, cx);
+                    });
+                    // 根据新字段类型更新 input_mode
+                    if let Some(input_mode) = first_input_mode {
+                        row.current_input_mode = input_mode;
+                    }
+                    row.clear_value(window, cx);
+                    // 如果第一个操作符无需输入值（TRUE/FALSE/IS NULL/IS NOT NULL），自动触发查询
+                    if first_input_mode == Some(ValueInputMode::NoValue) {
+                        cx.emit(FilterEditorEvent::QueryApply);
+                    }
+                    cx.notify();
+                }
+            },
+        );
+        row.subscriptions.push(sub);
+
+        // 订阅操作符选择事件
+        let row_id_for_operator = row_id;
+        let sub = cx.subscribe_in(
+            &row.operator_select,
+            window,
+            move |this, _, event, window, cx| {
+                if let SelectEvent::Confirm(Some(operator)) = event {
+                    let row = this.condition_rows.iter_mut().find(|r| r.row_id == row_id_for_operator);
+                    let Some(row) = row else { return };
+                    let input_mode = ValueInputMode::from_operator(*operator);
+                    row.current_input_mode = input_mode;
+                    // 清空值输入框
+                    row.value_input.update(cx, |state, cx| {
+                        state.set_value("".to_string(), window, cx);
+                    });
+                    row.value2_input.update(cx, |state, cx| {
+                        state.set_value("".to_string(), window, cx);
+                    });
+                    // 无需输入值的操作符（TRUE/FALSE/IS NULL/IS NOT NULL），选择后直接触发查询
+                    if input_mode == ValueInputMode::NoValue {
+                        cx.emit(FilterEditorEvent::QueryApply);
+                    }
+                    cx.notify();
+                }
+            },
+        );
+        row.subscriptions.push(sub);
+
+        // 订阅值输入框回车事件
+        let sub = cx.subscribe_in(
+            &row.value_input,
+            window,
+            |_, _, event: &InputEvent, _window, cx| {
+                if let InputEvent::PressEnter { .. } = event {
+                    cx.emit(FilterEditorEvent::QueryApply);
+                }
+            },
+        );
+        row.subscriptions.push(sub);
     }
 
-    pub fn set_schema(&mut self, schema: TableSchema, cx: &mut Context<Self>) {
-        let schema_clone = schema.clone();
+    pub fn get_where_clause(&self, cx: &App) -> String {
+        let conditions: Vec<String> = self
+            .condition_rows
+            .iter()
+            .filter_map(|row| {
+                let column = row.column_select.read(cx).selected_value()?.clone();
+                let operator = row.operator_select.read(cx).selected_value()?;
+                let value = row.value_input.read(cx).text().to_string();
+                let value2 = row.value2_input.read(cx).text().to_string();
 
-        self.where_editor.update(cx, |editor, cx| {
-            editor.editor.update(cx, |input_state, _cx| {
-                input_state.lsp.completion_provider =
-                    Some(Rc::new(WhereCompletionProvider::new(schema.clone())));
-            });
-        });
+                let input_mode = ValueInputMode::from_operator(*operator);
+                let sql_op = operator.to_sql();
 
-        self.order_by_editor.update(cx, |editor, cx| {
-            editor.editor.update(cx, |input_state, _cx| {
-                input_state.lsp.completion_provider =
-                    Some(Rc::new(OrderByCompletionProvider::new(schema_clone)));
-            });
-        });
+                match input_mode {
+                    ValueInputMode::NoValue => Some(format!("{} {}", column, sql_op)),
+                    ValueInputMode::SingleValue => {
+                        if value.is_empty() {
+                            return None;
+                        }
+                        let formatted = Self::format_sql_value(&value, *operator);
+                        Some(format!("{} {} {}", column, sql_op, formatted))
+                    }
+                    ValueInputMode::DualValue => {
+                        if value.is_empty() || value2.is_empty() {
+                            return None;
+                        }
+                        let v1 = Self::format_sql_value(&value, *operator);
+                        let v2 = Self::format_sql_value(&value2, *operator);
+                        Some(format!("{} {} {} AND {}", column, sql_op, v1, v2))
+                    }
+                    ValueInputMode::ListValue => {
+                        if value.is_empty() {
+                            return None;
+                        }
+                        let values: Vec<String> = value
+                            .split(',')
+                            .map(|s| Self::format_sql_value(s.trim(), *operator))
+                            .collect();
+                        Some(format!("{} {} ({})", column, sql_op, values.join(", ")))
+                    }
+                }
+            })
+            .collect();
+
+        if conditions.is_empty() {
+            String::new()
+        } else {
+            conditions.join(" AND ")
+        }
+    }
+
+    fn format_sql_value(value: &str, operator: FilterOperator) -> String {
+        match operator {
+            FilterOperator::IsTrue => "TRUE".to_string(),
+            FilterOperator::IsFalse => "FALSE".to_string(),
+            FilterOperator::Between => value.to_string(),
+            _ => match value.to_uppercase().as_str() {
+                "NULL" => "NULL".to_string(),
+                _ => format!("'{}'", value.replace('\'', "''")),
+            },
+        }
+    }
+
+    pub fn set_schema(&mut self, schema: TableSchema, _cx: &mut Context<Self>) {
+        self.schema = schema.clone();
+
+        // 如果条件行还没有初始化，标记为需要初始化
+        if self.condition_rows.is_empty() {
+            self.needs_init = true;
+            return;
+        }
+
+        // 更新现有行的字段选择器
+        for row in &mut self.condition_rows {
+            let column_items: Vec<ColumnSelectItem> = schema
+                .columns
+                .iter()
+                .map(|col| ColumnSelectItem {
+                    column: col.clone(),
+                })
+                .collect();
+
+            // 需要 window 来更新，但这里没有 window
+            // 延迟到 render 时更新
+            let _ = (column_items, row);
+        }
     }
 }
 
 impl Render for TableFilterEditor {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        use gpui::{ParentElement, Styled, div};
-        use gpui_component::h_flex;
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui::{div, ParentElement};
 
-        h_flex()
-            .size_full()
-            .gap_3()
-            .child(
-                h_flex()
-                    .flex_1()
-                    .items_center()
-                    .gap_2()
-                    .child({
-                        div()
-                            .py_1()
-                            .text_sm()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .text_color(cx.theme().primary)
-                            .child("WHERE")
-                    })
-                    .child(div().flex_1().child(self.where_editor.clone())),
-            )
-            .child(
-                h_flex()
-                    .flex_1()
-                    .items_center()
-                    .gap_2()
-                    .child(
-                        div()
-                            .py_1()
-                            .text_sm()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .text_color(cx.theme().primary)
-                            .child("ORDER BY"),
+        // 检查是否需要初始化条件行
+        if self.needs_init && !self.schema.columns.is_empty() {
+            self.needs_init = false;
+            let row_id = self.next_row_id;
+            self.next_row_id += 1;
+            let row = FilterRowState::new(row_id, &self.schema, window, cx);
+            self.condition_rows.push(row);
+            self.setup_row_subscriptions(row_id, window, cx);
+
+            // 初始化完成后，触发第一个列的 on_column_selected
+            if let Some(first_column) = self.schema.columns.first() {
+                if let Some(row) = self.condition_rows.first_mut() {
+                    row.update_operators_for_column(first_column, window, cx);
+                }
+            }
+
+            cx.notify();
+        }
+
+        let can_delete = self.condition_rows.len() > 1;
+
+        // 构建条件行的迭代器
+        let condition_rows_iter = self.condition_rows.iter().map(|row| {
+            let row_id = row.row_id;
+            let input_mode = row.current_input_mode;
+            let column_select = row.column_select.clone();
+            let operator_select = row.operator_select.clone();
+            let value_input = row.value_input.clone();
+            let value2_input = row.value2_input.clone();
+
+            gpui::div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .h(px(40.))
+                .px_2()
+                .border_1()
+                .border_color(cx.theme().border)
+                .rounded_md()
+                // 添加条件按钮
+                .child(
+                    Button::new(("add_condition", row_id))
+                        .icon(IconName::Plus)
+                        .ghost()
+                        .on_click(cx.listener(
+                            move |this, _: &ClickEvent, window: &mut Window, cx| {
+                                this.add_condition_row(window, cx);
+                                cx.notify();
+                            },
+                        )),
+                )
+                // 删除条件按钮
+                .child(
+                    Button::new(("remove_condition", row_id))
+                        .icon(IconName::Close)
+                        .ghost()
+                        .disabled(!can_delete)
+                        .on_click(cx.listener(
+                            move |this, _: &ClickEvent, _window: &mut Window, cx| {
+                                this.remove_condition_row(row_id, cx);
+                            },
+                        )),
+                )
+                .child(
+                    gpui::div()
+                        .flex()
+                        .w(px(240.))
+                        .h(px(28.))
+                        .content_center()
+                        .overflow_hidden()
+                        .child(Select::new(&column_select).small()),
+                )
+                .child(
+                    gpui::div()
+                        .flex()
+                        .w(px(200.))
+                        .h(px(28.))
+                        .content_center()
+                        .overflow_hidden()
+                        .child(Select::new(&operator_select).small()),
+                )
+                .when(input_mode == ValueInputMode::SingleValue || input_mode == ValueInputMode::ListValue, |this| {
+                    this.child(
+                        gpui::div()
+                            .flex_1()
+                            .min_w(px(80.))
+                            .h(px(28.))
+                            .content_center()
+                            .overflow_hidden()
+                            .child(Input::new(&value_input).small()),
                     )
-                    .child(div().flex_1().child(self.order_by_editor.clone())),
+                })
+                .when(input_mode == ValueInputMode::DualValue, |this| {
+                    this.child(
+                        gpui::div()
+                            .flex_1()
+                            .min_w(px(60.))
+                            .h(px(28.))
+                            .content_center()
+                            .overflow_hidden()
+                            .child(Input::new(&value_input)),
+                    )
+                    .child(
+                        gpui::div()
+                            .text_sm()
+                            .text_color(gpui::rgb(0x666666))
+                            .px_1()
+                            .child("AND"),
+                    )
+                    .child(
+                        gpui::div()
+                            .flex_1()
+                            .min_w(px(60.))
+                            .h(px(28.))
+                            .content_center()
+                            .overflow_hidden()
+                            .child(Input::new(&value2_input)),
+                    )
+                })
+                // .child(
+                //     Button::new(("remove_condition", row_id))
+                //         .icon(IconName::Close)
+                //         .ghost()
+                //         .on_click(cx.listener(
+                //             move |this, _: &ClickEvent, _window: &mut Window, cx| {
+                //                 this.remove_condition_row(row_id);
+                //                 cx.notify();
+                //             },
+                //         )),
+                // )
+        });
+
+        gpui::div()
+            .size_full()
+            .flex_col()
+            .gap_2()
+            // WHERE 条件构建器（每行自带 + 按钮）
+            .child(
+                div()
+                    .flex_col()
+                    .gap_2()
+                    // 条件行
+                    .children(condition_rows_iter),
             )
     }
 }

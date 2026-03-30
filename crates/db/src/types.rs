@@ -579,8 +579,11 @@ pub enum FilterOperator {
     NotLike,
     In,
     NotIn,
+    Between,
     IsNull,
     IsNotNull,
+    IsTrue,
+    IsFalse,
 }
 
 impl FilterOperator {
@@ -596,8 +599,11 @@ impl FilterOperator {
             Self::NotLike => "NOT LIKE",
             Self::In => "IN",
             Self::NotIn => "NOT IN",
+            Self::Between => "BETWEEN",
             Self::IsNull => "IS NULL",
             Self::IsNotNull => "IS NOT NULL",
+            Self::IsTrue => "= TRUE",
+            Self::IsFalse => "= FALSE",
         }
     }
 }
