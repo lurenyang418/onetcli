@@ -75,6 +75,41 @@ fn resolve_refresh_metadata_scope(node: &DbNode) -> RefreshMetadataScope {
 }
 
 // ============================================================================
+// 自动展开状态机 - 用于双击连接时自动展开到指定 Schema
+// ============================================================================
+
+/// 自动展开步骤
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ExpandStep {
+    /// 等待连接子节点（数据库）加载
+    WaitingConnectionChildren,
+    /// 等待数据库子节点（Schema）加载
+    WaitingDatabaseChildren,
+    /// 完成
+    Complete,
+}
+
+/// 待完成的自动展开任务
+#[derive(Debug, Clone)]
+struct PendingAutoExpand {
+    /// 连接ID
+    connection_id: String,
+    /// 目标数据库名称（为空表示默认数据库）
+    database: String,
+    /// 目标 Schema 名称
+    schema: String,
+    /// 当前步骤
+    step: ExpandStep,
+}
+
+/// 连接展开配置（存储 database 和 schema）
+#[derive(Debug, Clone, Default)]
+struct ConnectionExpandConfig {
+    database: Option<String>,
+    schema: Option<String>,
+}
+
+// ============================================================================
 // FlatDbEntry - 扁平化的树条目（用于 uniform_list 渲染）
 // ============================================================================
 
@@ -375,6 +410,10 @@ pub struct DbTreeView {
     search_debouncer: Arc<Debouncer>,
     // 数据库筛选：连接ID -> 选中的数据库ID集合（None 表示全选）
     selected_databases: HashMap<String, Option<HashSet<String>>>,
+    // 连接展开配置：连接ID -> (database, schema)
+    connection_expand_configs: HashMap<String, ConnectionExpandConfig>,
+    // 待完成的自动展开任务（双击连接时自动展开到指定 Schema）
+    pending_auto_expand: Option<PendingAutoExpand>,
     // 数据库筛选搜索词：连接ID -> 搜索词
     db_filter_search: HashMap<String, String>,
     // 数据库筛选列表状态：连接ID -> ListState
@@ -462,6 +501,7 @@ impl DbTreeView {
         let mut workspace_id = None;
         let mut unselected_databases_map = HashMap::new();
         let mut tracked_connection_ids = Vec::new();
+        let mut connection_expand_configs = HashMap::new();
 
         if connections.is_empty() {
             let node = DbNode::new(
@@ -501,6 +541,16 @@ impl DbTreeView {
                 if let Some(selected_dbs) = conn.get_selected_databases() {
                     let selected: HashSet<String> = selected_dbs.into_iter().collect();
                     unselected_databases_map.insert(id.clone(), Some(selected));
+                }
+
+                // 存储连接展开配置（database 和 schema）
+                if conn_config.database.is_some() || conn_config.schema.is_some() {
+                    info!("DbTreeView new: storing config for connection '{}' (id={}): db={:?}, schema={:?}",
+                          conn_config.name, id, conn_config.database, conn_config.schema);
+                    connection_expand_configs.insert(id.clone(), ConnectionExpandConfig {
+                        database: conn_config.database.clone(),
+                        schema: conn_config.schema.clone(),
+                    });
                 }
 
                 let node = DbNode::new(
@@ -580,6 +630,8 @@ impl DbTreeView {
             search_seq: 0,
             search_debouncer,
             selected_databases: unselected_databases_map,
+            connection_expand_configs,
+            pending_auto_expand: None,
             db_filter_search: HashMap::new(),
             db_filter_list_states: HashMap::new(),
             tracked_connection_ids,
@@ -954,8 +1006,12 @@ impl DbTreeView {
         // 同步更新选中节点，确保 lazy_load_children 完成后能正确触发 NodeSelected 事件
         self.selected_node_id = Some(node_id.clone());
 
-        self.lazy_load_children(connection_id.to_string(), cx);
-        self.lazy_load_children(node_id.clone(), cx);
+        // 如果自动展开正在进行中，不要重复触发 lazy_load_children
+        // 让自动展开的回调链来处理
+        if self.pending_auto_expand.is_none() {
+            self.lazy_load_children(connection_id.to_string(), cx);
+            self.lazy_load_children(node_id.clone(), cx);
+        }
         self.rebuild_tree(cx);
 
         Some(node_id)
@@ -1229,9 +1285,16 @@ impl DbTreeView {
             }
         };
 
+        // 调试：打印 pending_auto_expand 状态
+        let pending_debug = if let Some(ref pending) = self.pending_auto_expand {
+            format!("pending_auto_expand: step={:?}, db='{}', schema='{}'", pending.step, pending.database, pending.schema)
+        } else {
+            "pending_auto_expand: None".to_string()
+        };
+
         info!(
-            "DbTreeView lazy_load_children: attempting to load children for: {} (type: {:?})",
-            node_id, node.node_type
+            "DbTreeView lazy_load_children: node_id={}, type={:?}, {}",
+            node_id, node.node_type, pending_debug
         );
 
         // 标记为正在加载
@@ -1312,6 +1375,77 @@ impl DbTreeView {
                         // 触发已展开子节点的懒加载
                         for child_id in children_to_expand {
                             this.lazy_load_children(child_id, cx);
+                        }
+
+                        // 处理自动展开到 Schema
+                        if let Some(pending) = this.pending_auto_expand.take() {
+                            if pending.step == ExpandStep::WaitingConnectionChildren
+                                && node_type == DbNodeType::Connection
+                            {
+                                // 连接子节点加载完成，查找目标数据库并展开
+                                let target_db = if pending.database.is_empty() {
+                                    // 空表示使用第一个数据库
+                                    children.first().and_then(|c| {
+                                        if c.node_type == DbNodeType::Database {
+                                            Some(c.id.clone())
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                } else {
+                                    // 查找指定数据库
+                                    children
+                                        .iter()
+                                        .find(|c| c.node_type == DbNodeType::Database && c.name == pending.database)
+                                        .map(|c| c.id.clone())
+                                };
+
+                                if let Some(db_id) = target_db {
+                                    let db_name = if pending.database.is_empty() {
+                                        // 空表示使用第一个数据库，获取其名称
+                                        children.iter().find(|c| c.id == db_id).map(|c| c.name.clone()).unwrap_or_default()
+                                    } else {
+                                        pending.database.clone()
+                                    };
+                                    this.expanded_nodes.insert(db_id.clone());
+                                    this.pending_auto_expand = Some(PendingAutoExpand {
+                                        connection_id: pending.connection_id,
+                                        database: db_name,
+                                        schema: pending.schema,
+                                        step: ExpandStep::WaitingDatabaseChildren,
+                                    });
+                                    this.lazy_load_children(db_id, cx);
+                                } else {
+                                    // 没找到数据库，清除待展开任务
+                                    this.pending_auto_expand = None;
+                                }
+                            } else if pending.step == ExpandStep::WaitingDatabaseChildren
+                                && node_type == DbNodeType::Database
+                            {
+                                // 数据库子节点加载完成，查找目标 Schema 并展开
+                                let target_schema = children
+                                    .iter()
+                                    .find(|c| c.node_type == DbNodeType::Schema && c.name == pending.schema)
+                                    .map(|c| c.id.clone());
+
+                                if let Some(schema_id) = target_schema {
+                                    this.expanded_nodes.insert(schema_id.clone());
+                                    this.pending_auto_expand = Some(PendingAutoExpand {
+                                        connection_id: pending.connection_id,
+                                        database: pending.database,
+                                        schema: pending.schema,
+                                        step: ExpandStep::Complete,
+                                    });
+                                    this.lazy_load_children(schema_id, cx);
+                                } else {
+                                    this.pending_auto_expand = None;
+                                }
+                            } else {
+                                info!(
+                                    "DbTreeView auto-expand: step/node_type mismatch, clearing pending. step={:?}, node_type={:?}",
+                                    pending.step, node_type
+                                );
+                            }
                         }
                     }
                     Err(e) => {
@@ -1597,6 +1731,19 @@ impl DbTreeView {
     pub fn active_connection(&mut self, active_conn_id: String, cx: &mut Context<Self>) {
         self.selected_node_id = Some(active_conn_id.clone());
         self.expanded_nodes.insert(active_conn_id.clone());
+
+        // 检查连接是否配置了 database 或 schema，如果有则设置自动展开
+        if let Some(config) = self.connection_expand_configs.get(&active_conn_id).cloned() {
+            if config.database.is_some() || config.schema.is_some() {
+                self.pending_auto_expand = Some(PendingAutoExpand {
+                    connection_id: active_conn_id.clone(),
+                    database: config.database.unwrap_or_default(),
+                    schema: config.schema.unwrap_or_default(),
+                    step: ExpandStep::WaitingConnectionChildren,
+                });
+            }
+        }
+
         self.lazy_load_children(active_conn_id, cx);
         self.rebuild_tree(cx);
     }
@@ -1747,8 +1894,48 @@ impl DbTreeView {
                         node_id: node.id.clone(),
                     });
                 }
-                DbNodeType::Connection
-                | DbNodeType::Database
+                DbNodeType::Connection => {
+                    // 如果连接配置了 database 或 schema，双击时自动展开
+                    if let Some(config) = self.connection_expand_configs.get(node_id).cloned() {
+                        if config.database.is_some() || config.schema.is_some() {
+                            self.pending_auto_expand = Some(PendingAutoExpand {
+                                connection_id: node_id.to_string(),
+                                database: config.database.unwrap_or_default(),
+                                schema: config.schema.unwrap_or_default(),
+                                step: ExpandStep::WaitingConnectionChildren,
+                            });
+                            // 展开连接并加载子节点
+                            self.expanded_nodes.insert(node_id.to_string());
+                            self.lazy_load_children(node_id.to_string(), cx);
+                            self.rebuild_tree(cx);
+                        } else {
+                            // 没有配置，走普通展开/折叠逻辑
+                            let is_expanded = self.expanded_nodes.contains(node_id);
+                            if is_expanded {
+                                self.expanded_nodes.remove(node_id);
+                            } else {
+                                self.expanded_nodes.insert(node_id.to_string());
+                            }
+                            if !is_expanded {
+                                self.lazy_load_children(node_id.to_string(), cx);
+                            }
+                            self.rebuild_tree(cx);
+                        }
+                    } else {
+                        // 普通展开/折叠逻辑
+                        let is_expanded = self.expanded_nodes.contains(node_id);
+                        if is_expanded {
+                            self.expanded_nodes.remove(node_id);
+                        } else {
+                            self.expanded_nodes.insert(node_id.to_string());
+                        }
+                        if !is_expanded {
+                            self.lazy_load_children(node_id.to_string(), cx);
+                        }
+                        self.rebuild_tree(cx);
+                    }
+                }
+                DbNodeType::Database
                 | DbNodeType::Schema
                 | DbNodeType::ColumnsFolder
                 | DbNodeType::IndexesFolder

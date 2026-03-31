@@ -133,10 +133,6 @@ impl DbManager {
     pub fn get_plugin(&self, db_type: &DatabaseType) -> Result<Arc<dyn DatabasePlugin>, DbError> {
         match db_type {
             DatabaseType::PostgreSQL => Ok(Arc::clone(&self.postgresql)),
-            _ => Err(DbError::Internal(format!(
-                "Unsupported database type: {:?}",
-                db_type
-            ))),
         }
     }
 }

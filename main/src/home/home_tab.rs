@@ -13,14 +13,13 @@ use gpui_component::{
     h_flex,
     input::{Input, InputState},
     list::{List, ListState},
-    tooltip::Tooltip,
     v_flex,
 };
 use one_core::connection_notifier::{ConnectionDataEvent, emit_connection_event, get_notifier};
 use one_core::popup_window::{PopupWindowOptions, open_popup_window};
 use one_core::storage::traits::Repository;
 use one_core::storage::{
-    ActiveConnections, ConnectionRepository, ConnectionType, DatabaseType, GlobalStorageState,
+    ActiveConnections, ConnectionRepository, DatabaseType, GlobalStorageState,
     StoredConnection,
 };
 use one_core::tab_container::{TabContainer, TabContent, TabContentEvent, TabItem};
@@ -367,7 +366,7 @@ impl HomePage {
             } else {
                 t!("Connection.new", db_type = db_type.as_str()).to_string()
             })
-            .size(700.0, 700.0),
+            .size(720.0, 780.0),
             move |window, cx| cx.new(|cx| ConnectionFormWindow::new(config, window, cx)),
             cx,
         );
@@ -877,248 +876,6 @@ impl HomePage {
             );
 
         item.into_any_element()
-    }
-
-    fn render_connection_card(
-        &self,
-        conn: StoredConnection,
-        selected_id: Option<i64>,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let conn_id = conn.id;
-        let clone_conn = conn.clone();
-        let edit_conn = conn.clone();
-        let edit_conn_type = conn.connection_type;
-        let edit_conn_name = conn.name.clone();
-        let delete_conn_id = conn.id;
-        let delete_conn_name = conn.name.clone();
-        let is_selected = selected_id == conn.id;
-
-        let is_active = conn
-            .id
-            .map_or(false, |id| cx.global::<ActiveConnections>().is_active(id));
-
-        let can_edit = true;
-        let has_team = false;
-
-        let card = v_flex()
-            .justify_center()
-            .id(SharedString::from(format!(
-                "conn-card-{}",
-                conn.id.unwrap_or(0)
-            )))
-            .w_full()
-            .h(px(90.))
-            .rounded(px(8.0))
-            .bg(cx.theme().background)
-            .p_3()
-            .border_1()
-            .rounded_lg()
-            .relative()
-            .overflow_hidden()
-            .shadow_sm()
-            .group("")
-            .when(is_selected, |this| {
-                this.border_color(cx.theme().list_active_border)
-                    .shadow_lg()
-                    .border_l_3()
-            })
-            .when(!is_selected, |this| this.border_color(cx.theme().border))
-            .cursor_pointer()
-            .hover(|style| {
-                style
-                    .shadow_lg()
-                    .border_color(cx.theme().list_active_border)
-            })
-            .on_double_click(cx.listener(move |this, _, w, cx| {
-                this.add_item_to_tab(&clone_conn, w, cx);
-                cx.notify()
-            }))
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.selected_connection_id = conn_id;
-                cx.notify();
-            }))
-            .when(is_active, |this| {
-                this.child(
-                    div()
-                        .absolute()
-                        .top(px(6.0))
-                        .left(px(6.0))
-                        .w(px(10.0))
-                        .h(px(10.0))
-                        .rounded_full()
-                        .bg(cx.theme().success)
-                        .shadow_lg(),
-                )
-            })
-            .child(
-                // hover时显示的编辑和删除按钮
-                h_flex()
-                    .absolute()
-                    .top_2()
-                    .right_2()
-                    .gap_1()
-                    .group_hover("", |style| style.opacity(1.0))
-                    .opacity(0.0)
-                    .when(can_edit, |this| {
-                        this.child(
-                            Button::new(SharedString::from(format!(
-                                "edit-conn-{}",
-                                conn.id.unwrap_or(0)
-                            )))
-                            .icon(IconName::Edit)
-                            .with_size(Size::Small)
-                            .primary()
-                            .tooltip(t!("Home.edit_connection"))
-                            .on_click(cx.listener(
-                                move |this, _, window, cx| {
-                                    cx.stop_propagation();
-                                    if let Some(conn_id) = edit_conn.id {
-                                        let conn_name = edit_conn_name.clone();
-                                        match edit_conn_type {
-                                            ConnectionType::Database => {
-                                                let db_type = edit_conn
-                                                    .to_db_connection()
-                                                    .ok()
-                                                    .map(|p| p.database_type);
-                                                this.confirm_edit_connection(
-                                                    conn_id, conn_name, db_type, window, cx,
-                                                );
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                },
-                            )),
-                        )
-                        .child(
-                            Button::new(SharedString::from(format!(
-                                "delete-conn-{}",
-                                conn.id.unwrap_or(0)
-                            )))
-                            .icon(IconName::Remove)
-                            .with_size(Size::Small)
-                            .danger()
-                            .tooltip(t!("Home.delete_connection"))
-                            .on_click(cx.listener(
-                                move |this, _, window, cx| {
-                                    cx.stop_propagation();
-                                    if let Some(conn_id) = delete_conn_id {
-                                        let conn_name = delete_conn_name.clone();
-                                        this.confirm_delete_connection(
-                                            conn_id, conn_name, window, cx,
-                                        );
-                                    }
-                                },
-                            )),
-                        )
-                    }),
-            )
-            .child(
-                h_flex()
-                    .items_center()
-                    .gap_2()
-                    .w_full()
-                    .child(
-                        div()
-                            .h(px(48.0))
-                            .rounded(px(8.0))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(match conn.connection_type {
-                                ConnectionType::Database => {
-                                    let icon = conn
-                                        .to_db_connection()
-                                        .map(|c| c.database_type.as_icon())
-                                        .unwrap_or_else(|_| IconName::Database.color());
-                                    icon.with_size(px(40.0)).text_color(gpui::white())
-                                }
-                                _ => IconName::Server
-                                    .color()
-                                    .with_size(px(40.0))
-                                    .text_color(gpui::white()),
-                            }),
-                    )
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .min_w_0()
-                            .gap_0p5()
-                            .overflow_hidden()
-                            .child({
-                                let name_tooltip: SharedString = conn.name.clone().into();
-                                h_flex()
-                                    .gap_1()
-                                    .overflow_hidden()
-                                    .child(
-                                        div()
-                                            .id(SharedString::from(format!(
-                                                "conn-name-{}",
-                                                conn.id.unwrap_or(0)
-                                            )))
-                                            .text_sm()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(cx.theme().foreground)
-                                            .overflow_hidden()
-                                            .text_ellipsis()
-                                            .whitespace_nowrap()
-                                            .flex_shrink()
-                                            .min_w_0()
-                                            .tooltip(move |window, cx| {
-                                                Tooltip::new(name_tooltip.clone()).build(window, cx)
-                                            })
-                                            .child(conn.name.clone()),
-                                    )
-                                    .when(has_team, |this| {
-                                        this.child(
-                                            div()
-                                                .flex_shrink_0()
-                                                .px_1()
-                                                .rounded(px(3.0))
-                                                .bg(cx.theme().accent.opacity(0.15))
-                                                .text_color(cx.theme().accent)
-                                                .text_xs()
-                                                .child(t!("Home.team_badge").to_string()),
-                                        )
-                                    })
-                            })
-                            .when(conn.connection_type == ConnectionType::Database, |this| {
-                                if let Ok(params) = conn.to_db_connection() {
-                                    let database = match params.database {
-                                        Some(database) => format!("/{}", database),
-                                        None => "".to_string(),
-                                    };
-                                    let conn_info = format!(
-                                        "{}@{}:{}{}",
-                                        params.username, params.host, params.port, database
-                                    );
-                                    let tooltip_text: SharedString = conn_info.clone().into();
-                                    this.child(
-                                        div()
-                                            .id(SharedString::from(format!(
-                                                "conn-info-{}",
-                                                conn.id.unwrap_or(0)
-                                            )))
-                                            .text_xs()
-                                            .text_color(cx.theme().muted_foreground)
-                                            .overflow_hidden()
-                                            .text_ellipsis()
-                                            .whitespace_nowrap()
-                                            .max_w_full()
-                                            .tooltip(move |window, cx| {
-                                                Tooltip::new(tooltip_text.clone()).build(window, cx)
-                                            })
-                                            .child(conn_info),
-                                    )
-                                } else {
-                                    this
-                                }
-                            })
-                    ),
-            );
-
-        card.into_any_element()
     }
 
     pub(crate) fn add_item_to_tab(

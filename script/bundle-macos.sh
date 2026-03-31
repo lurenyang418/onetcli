@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-APP_NAME="pig"
-BINARY_NAME="pig"
+APP_NAME="Pig"
+BINARY_NAME="Pig"
 TARGET="${1:-aarch64-apple-darwin}"
 VERSION="${PIG_VERSION:-0.1.0}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -36,9 +36,9 @@ sed "s/\${PIG_VERSION}/${VERSION}/g" \
 bash "${PROJECT_DIR}/script/generate-macos-icon.sh"
 
 # Copy icon
-ICNS_PATH="${PROJECT_DIR}/resources/macos/pig.icns"
+ICNS_PATH="${PROJECT_DIR}/resources/macos/Pig.icns"
 if [ -f "$ICNS_PATH" ]; then
-    cp "$ICNS_PATH" "$APP_DIR/Contents/Resources/pig.icns"
+    cp "$ICNS_PATH" "$APP_DIR/Contents/Resources/Pig.icns"
 else
     echo "Warning: Icon file not found at ${ICNS_PATH}"
 fi

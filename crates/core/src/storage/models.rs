@@ -212,6 +212,7 @@ pub struct DbConnectionConfig {
     pub username: String,
     pub password: String,
     pub database: Option<String>,
+    pub schema: Option<String>,
     pub service_name: Option<String>,
     pub sid: Option<String>,
     #[serde(skip)]
@@ -246,6 +247,7 @@ impl DbConnectionConfig {
             || self.username != other.username
             || self.password != other.password
             || self.database != other.database
+            || self.schema != other.schema
             || self.service_name != other.service_name
             || self.sid != other.sid
             || self.extra_params != other.extra_params

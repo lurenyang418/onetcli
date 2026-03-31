@@ -676,10 +676,15 @@ impl DatabaseObjects {
         let is_last_column = columns.len();
         for (col_ix, column) in columns.iter().enumerate() {
             let is_last = col_ix == is_last_column - 1;
+            // 只有 id、created_at、updated_at 等固定宽度列保持固定宽度，其他列自适应
+            let is_fixed_width_column = matches!(column.key.as_str(), "id" | "created_at" | "updated_at");
+            let is_name_column = column.key == "name";
+            let should_flex = is_last || !is_fixed_width_column;
             header = header.child(
                 div()
-                    .when(!is_last, |el| el.w(column.width))
-                    .when(is_last, |el| el.flex_1())
+                    .when(!should_flex, |el| el.w(column.width))
+                    .when(should_flex && !is_name_column, |el| el.flex_1())
+                    .when(is_name_column, |el| el.w(px(420.)))
                     .h_full()
                     .px_2()
                     .text_sm()
@@ -689,7 +694,14 @@ impl DatabaseObjects {
                             .size_full()
                             .flex()
                             .items_center()
-                            .child(column.name.clone()),
+                            .overflow_hidden()
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .overflow_hidden()
+                                    .text_ellipsis()
+                                    .child(column.name.clone()),
+                            ),
                     ),
             );
         }
@@ -729,31 +741,34 @@ impl DatabaseObjects {
         for (col_ix, column) in columns.iter().enumerate() {
             let cell_value = row_values.get(col_ix).cloned().unwrap_or_default();
             let tooltip_text = cell_value.clone();
-            let cell = if col_ix == 0 {
+            let is_first_column = col_ix == 0;
+            let is_fixed_width_column = matches!(column.key.as_str(), "id" | "created_at" | "updated_at");
+            let should_flex = is_last_column == 0 || col_ix < is_last_column - 1 || (!is_fixed_width_column && !is_first_column);
+
+            let cell = if is_first_column {
                 let icon = get_icon_for_node_type(&db_node_type, cx.theme()).color();
                 let label = if search_query.is_empty() {
-                    Label::new(cell_value)
+                    Label::new(cell_value).text_ellipsis()
                 } else {
-                    Label::new(cell_value).highlights(search_query.to_string())
+                    Label::new(cell_value).highlights(search_query.to_string()).text_ellipsis()
                 };
                 h_flex()
                     .gap_2()
                     .items_center()
                     .child(icon)
-                    .child(label)
+                    .child(div().flex_1().overflow_hidden().child(label))
                     .into_any_element()
             } else {
                 div().child(cell_value).into_any_element()
             };
 
-            // 最后一列使用 flex_1 自动填充剩余空间，其他列使用固定宽度
-            let is_last = col_ix == is_last_column - 1;
             let cell_id = SharedString::from(format!("cell-{}-{}", row_ix, col_ix));
             row = row.child(
                 div()
                     .id(cell_id)
-                    .when(!is_last, |el| el.w(column.width))
-                    .when(is_last, |el| el.flex_1())
+                    .when(!should_flex && !is_first_column, |el| el.w(column.width))
+                    .when(should_flex && !is_first_column, |el| el.flex_1())
+                    .when(is_first_column, |el| el.w(px(420.)))
                     .px_2()
                     .overflow_hidden()
                     .text_ellipsis()
@@ -768,6 +783,40 @@ impl DatabaseObjects {
         }
 
         row
+    }
+
+    /// 构建当前对象的简短标题（如 "Schema: public"）
+    fn build_object_title(&self, default_title: &str) -> String {
+        if let Some(ref node) = self.current_node {
+            match node.node_type {
+                DbNodeType::Connection => {
+                    format!("{}: {}", t!("Common.connection"), node.name)
+                }
+                DbNodeType::Database => {
+                    format!("{}: {}", t!("Common.database"), node.name)
+                }
+                DbNodeType::Schema => {
+                    format!("{}: {}", t!("Common.schema"), node.name)
+                }
+                DbNodeType::TablesFolder => {
+                    format!("{}: {}", t!("Common.tables"), node.name)
+                }
+                DbNodeType::Table => {
+                    format!("{}: {}", t!("Common.table"), node.name)
+                }
+                DbNodeType::ViewsFolder => {
+                    format!("{}: {}", t!("Common.views"), node.name)
+                }
+                DbNodeType::View => {
+                    format!("{}: {}", t!("Common.view"), node.name)
+                }
+                _ => {
+                    format!("{}: {}", default_title, node.name)
+                }
+            }
+        } else {
+            default_title.to_string()
+        }
     }
 
     fn render_toolbar_buttons(
@@ -883,8 +932,6 @@ impl DatabaseObjects {
 
 impl Render for DatabaseObjects {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let loaded_data = self.loaded_data.read(cx);
-        let title = loaded_data.title.clone();
         let toolbar_buttons = self.render_toolbar_buttons(window, cx);
         let columns = self.columns.clone();
         let row_count = self.filtered_rows.len();
@@ -993,7 +1040,6 @@ impl Render for DatabaseObjects {
                     ),
                 ),
             )
-            .child(div().p_2().text_sm().child(title))
     }
 }
 
@@ -1078,8 +1124,10 @@ impl TabContent for DatabaseObjectsPanel {
         "DatabaseObjects"
     }
 
-    fn title(&self, _cx: &App) -> SharedString {
-        SharedString::from(t!("DatabaseObjects.title"))
+    fn title(&self, cx: &App) -> SharedString {
+        self.database_objects.read(cx)
+            .build_object_title(&t!("DatabaseObjects.title"))
+            .into()
     }
 
     fn closeable(&self, _cx: &App) -> bool {

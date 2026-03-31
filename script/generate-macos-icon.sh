@@ -4,10 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SOURCE_PNG="${1:-${PROJECT_DIR}/logo.png}"
-OUTPUT_ICNS="${2:-${PROJECT_DIR}/resources/macos/pig.icns}"
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/pig-icon.XXXXXX")"
-ICONSET_DIR="${WORK_DIR}/pig.iconset"
-MASTER_PNG="${WORK_DIR}/pig-master.png"
+OUTPUT_ICNS="${2:-${PROJECT_DIR}/resources/macos/Pig.icns}"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/Pig-icon.XXXXXX")"
+ICONSET_DIR="${WORK_DIR}/Pig.iconset"
+MASTER_PNG="${WORK_DIR}/Pig-master.png"
 
 cleanup() {
     rm -rf "$WORK_DIR"

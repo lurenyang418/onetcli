@@ -355,7 +355,7 @@ pub struct TableFilterEditor {
 }
 
 impl TableFilterEditor {
-    pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
         Self {
             condition_rows: Vec::new(),
             schema: TableSchema {

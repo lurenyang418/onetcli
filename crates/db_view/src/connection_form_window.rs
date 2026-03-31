@@ -1,7 +1,7 @@
 use gpui::prelude::FluentBuilder;
 use gpui::{
     div, App, Context, Entity, FocusHandle, Focusable, IntoElement, ParentElement, Render,
-    SharedString, Styled, Window,
+    Styled, Window,
 };
 use gpui_component::{
     button::{Button, ButtonVariants as _},
@@ -36,16 +36,7 @@ impl ConnectionFormWindow {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let is_editing = config.editing_connection.is_some();
         let db_type = config.db_type;
-
-        let title: SharedString = if is_editing {
-            t!("Connection.edit", db_type = db_type.as_str()).to_string()
-        } else {
-            t!("Connection.new", db_type = db_type.as_str()).to_string()
-        }
-        .into();
-
         let plugin_registry = cx.global::<DatabaseViewPluginRegistry>();
         let plugin = plugin_registry
             .get(&db_type)
@@ -59,7 +50,7 @@ impl ConnectionFormWindow {
             });
         }
 
-        let is_edit = is_editing;
+        let is_edit = config.editing_connection.is_some();
         cx.subscribe_in(
             &form,
             window,

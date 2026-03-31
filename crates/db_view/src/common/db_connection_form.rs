@@ -3,7 +3,7 @@ use db::GlobalDbState;
 use gpui::prelude::FluentBuilder;
 use gpui::{
     App, AsyncApp, Axis, Context, Entity, EventEmitter, FocusHandle, Focusable, IntoElement,
-    ParentElement, PathPromptOptions, Render, SharedString, Styled, Window, div, prelude::*, px,
+    ParentElement, Render, SharedString, Styled, Window, div, prelude::*, px,
 };
 use gpui_component::{
     ActiveTheme, IndexPath, Sizable, Size,
@@ -355,6 +355,13 @@ impl DbFormConfig {
                     )
                     .optional()
                     .placeholder("database name (optional)"),
+                    FormField::new(
+                        "schema",
+                        t!("ConnectionForm.schema"),
+                        FormFieldType::Text,
+                    )
+                    .optional()
+                    .placeholder("public (optional)"),
                     // Advanced: connect_timeout
                     FormField::new(
                         "connect_timeout",
@@ -601,6 +608,9 @@ impl DbConnectionForm {
             if let Some(db) = &params.database {
                 self.set_field_value("database", db, window, cx);
             }
+            if let Some(schema) = &params.schema {
+                self.set_field_value("schema", schema, window, cx);
+            }
             if let Some(sn) = &params.service_name {
                 self.set_field_value("service_name", sn, window, cx);
             }
@@ -680,6 +690,7 @@ impl DbConnectionForm {
             "username",
             "password",
             "database",
+            "schema",
             "remark",
             "service_name",
             "sid",
@@ -713,6 +724,7 @@ impl DbConnectionForm {
             username: self.get_field_value("username", cx).unwrap_or_default(),
             password: self.get_field_value("password", cx).unwrap_or_default(),
             database: self.get_field_value("database", cx),
+            schema: self.get_field_value("schema", cx),
             service_name: self.get_field_value("service_name", cx),
             sid: self.get_field_value("sid", cx),
             workspace_id,
@@ -1005,32 +1017,6 @@ impl DbConnectionForm {
         .detach();
     }
 
-    fn browse_file_path(&mut self, _window: &mut Window, cx: &mut App) {
-        let pending = self.pending_file_path.clone();
-
-        let future = cx.prompt_for_paths(PathPromptOptions {
-            files: true,
-            multiple: false,
-            directories: false,
-            prompt: Some(t!("ConnectionForm.select_database_file").into()),
-        });
-
-        cx.spawn(async move |cx| {
-            if let Ok(Ok(Some(paths))) = future.await {
-                if let Some(path) = paths.first() {
-                    let path_str = path.to_string_lossy().to_string();
-                    let _ = cx.update(|cx| {
-                        pending.update(cx, |p, cx| {
-                            *p = Some(path_str);
-                            cx.notify();
-                        });
-                    });
-                }
-            }
-        })
-        .detach();
-    }
-
     fn get_input_by_name(&self, field_name: &str) -> Option<Entity<InputState>> {
         let mut idx = 0;
         for tab_group in &self.config.tab_groups {
@@ -1077,7 +1063,6 @@ impl Render for DbConnectionForm {
 
         v_flex()
             .gap_4()
-            .size_full()
             .child(
                 // Tab bar
                 div().flex().justify_center().child(
@@ -1101,7 +1086,7 @@ impl Render for DbConnectionForm {
                 // Form fields for active tab
                 div()
                     .flex_1()
-                    .min_h(px(250.))
+                    .min_h(px(280.))
                     .overflow_y_scrollbar()
                     .when(!current_tab_fields.is_empty(), |this| {
                         let _is_general_tab = self.active_tab == 0;

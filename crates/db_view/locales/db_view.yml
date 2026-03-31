@@ -134,6 +134,26 @@ Common:
     en: This action cannot be undone.
     zh-CN: 此操作不可恢复。
     zh-HK: 此操作不可恢復。
+  connection:
+    en: "Connection"
+    zh-CN: "连接"
+    zh-HK: "連接"
+  database:
+    en: "Database"
+    zh-CN: "数据库"
+    zh-HK: "資料庫"
+  schema:
+    en: "Schema"
+    zh-CN: "模式"
+    zh-HK: "模式"
+  views:
+    en: "View"
+    zh-CN: "视图"
+    zh-HK: "視圖"
+  tables:
+    en: "Table"
+    zh-CN: "表"
+    zh-HK: "表"
 
 # 连接操作
 Connection:
@@ -186,6 +206,10 @@ ConnectionForm:
       en: Database
       zh-CN: 数据库
       zh-HK: 數據庫
+    schema:
+      en: Schema
+      zh-CN: Schema
+      zh-HK: Schema
     username:
       en: Username
       zh-CN: 用户名
@@ -269,9 +293,9 @@ ConnectionForm:
     zh-CN: 数据库
     zh-HK: 資料庫
   schema:
-    en: Scheme
-    zh-CN: 协议
-    zh-HK: 協議
+    en: Schema
+    zh-CN: 模式
+    zh-HK: 模式
   database_file_path:
     en: Database File Path
     zh-CN: 数据库文件路径

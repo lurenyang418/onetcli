@@ -1,11 +1,11 @@
 [Desktop Entry]
-Name=pig
+Name=Pig
 Comment=Pig - A Postgres GUI Client
-Exec=pig
-Icon=pig
+Exec=Pig
+Icon=Pig
 Type=Application
 Categories=Development;Utility;Database;
 Terminal=false
-StartupWMClass=pig
+StartupWMClass=Pig
 MimeType=
 Keywords=database;postgresql;

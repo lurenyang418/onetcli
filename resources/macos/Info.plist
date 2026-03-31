@@ -3,19 +3,19 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>pig</string>
+    <string>Pig</string>
     <key>CFBundleDisplayName</key>
-    <string>pig</string>
+    <string>Pig</string>
     <key>CFBundleIdentifier</key>
-    <string>com.pig.app</string>
+    <string>tech.lury.pig</string>
     <key>CFBundleVersion</key>
     <string>${PIG_VERSION}</string>
     <key>CFBundleShortVersionString</key>
     <string>${PIG_VERSION}</string>
     <key>CFBundleExecutable</key>
-    <string>pig</string>
+    <string>Pig</string>
     <key>CFBundleIconFile</key>
-    <string>pig</string>
+    <string>Pig</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>
