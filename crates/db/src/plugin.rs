@@ -155,6 +155,11 @@ pub trait DatabasePlugin: Send + Sync {
         false
     }
 
+    /// Whether this database supports user-defined types (e.g., PostgreSQL, Oracle)
+    fn supports_types(&self) -> bool {
+        false
+    }
+
     /// Whether this database supports rowid for row identification (e.g., Oracle, SQLite)
     fn supports_rowid(&self) -> bool {
         false
@@ -378,6 +383,16 @@ pub trait DatabasePlugin: Send + Sync {
         connection: &dyn DbConnection,
         database: &str,
     ) -> Result<ObjectView>;
+
+    // === Type Operations (ENUM, DOMAIN, COMPOSITE, etc.) ===
+    async fn list_types(
+        &self,
+        connection: &dyn DbConnection,
+        database: &str,
+        schema: Option<String>,
+    ) -> Result<Vec<TypeInfo>> {
+        Ok(Vec::new())
+    }
 
     // === Helper Methods ===
     fn build_column_definition(&self, column: &ColumnInfo, include_name: bool) -> String;
@@ -638,7 +653,7 @@ pub trait DatabasePlugin: Send + Sync {
         // Sequences folder (only for databases that support sequences)
         if self.supports_sequences() {
             let sequences = self
-                .list_sequences(connection, database, schema)
+                .list_sequences(connection, database, schema.clone())
                 .await
                 .unwrap_or_default();
             let sequence_count = sequences.len();
@@ -682,6 +697,49 @@ pub trait DatabasePlugin: Send + Sync {
                 sequences_folder.set_children(children);
             }
             nodes.push(sequences_folder);
+        }
+
+        // Types folder (for databases that support user-defined types like ENUM, DOMAIN)
+        if self.supports_types() {
+            let types = self
+                .list_types(connection, database, schema.clone())
+                .await
+                .unwrap_or_default();
+            let type_count = types.len();
+            let mut types_folder = DbNode::new(
+                format!("{}:types_folder", id),
+                "DbTree.Types".to_string(),
+                DbNodeType::TypesFolder,
+                node.connection_id.clone(),
+                node.database_type,
+            )
+            .with_parent_context(id)
+            .with_metadata(metadata.clone());
+            if type_count > 0 {
+                let children: Vec<DbNode> = types
+                    .into_iter()
+                    .map(|t| {
+                        let mut type_meta: HashMap<String, String> = metadata.clone();
+                        type_meta.insert("type_type".to_string(), t.type_type.clone());
+                        if let Some(desc) = t.description {
+                            if !desc.is_empty() {
+                                type_meta.insert("description".to_string(), desc);
+                            }
+                        }
+                        DbNode::new(
+                            format!("{}:types_folder:{}", id, t.name),
+                            t.name.clone(),
+                            DbNodeType::Type,
+                            node.connection_id.clone(),
+                            node.database_type,
+                        )
+                        .with_parent_context(format!("{}:types_folder", id))
+                        .with_metadata(type_meta)
+                    })
+                    .collect();
+                types_folder.set_children(children);
+            }
+            nodes.push(types_folder);
         }
 
         let queries_folder = self.load_queries(node, metadata.clone()).await?;
@@ -741,7 +799,8 @@ pub trait DatabasePlugin: Send + Sync {
             | DbNodeType::ViewsFolder
             | DbNodeType::FunctionsFolder
             | DbNodeType::ProceduresFolder
-            | DbNodeType::SequencesFolder => {
+            | DbNodeType::SequencesFolder
+            | DbNodeType::TypesFolder => {
                 if node.children_loaded {
                     return Ok(node.children.clone());
                 }
@@ -898,6 +957,33 @@ pub trait DatabasePlugin: Send + Sync {
                         )
                         .with_parent_context(id)
                         .with_metadata(meta)
+                    })
+                    .collect())
+            }
+            DbNodeType::TypesFolder => {
+                let types = self
+                    .list_types(connection, database, schema)
+                    .await
+                    .unwrap_or_default();
+                Ok(types
+                    .into_iter()
+                    .map(|t| {
+                        let mut type_meta: HashMap<String, String> = node.metadata.clone();
+                        type_meta.insert("type_type".to_string(), t.type_type.clone());
+                        if let Some(desc) = t.description {
+                            if !desc.is_empty() {
+                                type_meta.insert("description".to_string(), desc);
+                            }
+                        }
+                        DbNode::new(
+                            format!("{}:{}", id, t.name),
+                            t.name.clone(),
+                            DbNodeType::Type,
+                            node.connection_id.clone(),
+                            node.database_type,
+                        )
+                        .with_parent_context(id)
+                        .with_metadata(type_meta)
                     })
                     .collect())
             }
@@ -2081,6 +2167,9 @@ pub trait DatabasePlugin: Send + Sync {
                 .split_whitespace()
                 .next()
                 .unwrap_or(type_str)
+                .trim()
+                .trim_start_matches('<')
+                .trim_end_matches('>')
                 .to_string(),
             length: None,
             scale: None,

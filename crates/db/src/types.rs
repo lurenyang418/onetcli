@@ -57,6 +57,8 @@ pub enum DbNodeType {
     Sequence,
     QueriesFolder,
     NamedQuery,
+    TypesFolder,
+    Type,
 }
 
 impl fmt::Display for DbNodeType {
@@ -87,6 +89,8 @@ impl fmt::Display for DbNodeType {
             DbNodeType::NamedQuery => write!(f, "Query"),
             DbNodeType::SequencesFolder => write!(f, "Sequences"),
             DbNodeType::Sequence => write!(f, "Sequence"),
+            DbNodeType::TypesFolder => write!(f, "Types"),
+            DbNodeType::Type => write!(f, "Type"),
         }
     }
 }
@@ -297,6 +301,15 @@ pub struct SequenceInfo {
     pub increment: Option<i64>,
     pub min_value: Option<i64>,
     pub max_value: Option<i64>,
+}
+
+/// Type information (for PostgreSQL user-defined types like ENUM, DOMAIN, COMPOSITE)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TypeInfo {
+    pub name: String,
+    pub schema: Option<String>,
+    pub type_type: String, // ENUM, DOMAIN, COMPOSITE, etc.
+    pub description: Option<String>,
 }
 
 /// Check constraint information

@@ -6,7 +6,8 @@ use native_tls::TlsConnector;
 use one_core::storage::DbConnectionConfig;
 use postgres_native_tls::MakeTlsConnector;
 use tokio::sync::Mutex;
-use tokio_postgres::{types::Type, Client, Config, Row, Statement};
+use tokio_postgres::types::{Kind, Type};
+use tokio_postgres::{Client, Config, Row, Statement};
 use tracing::{debug, error, info};
 
 use crate::connection::{DbConnection, DbError, StreamingProgress};
@@ -139,6 +140,11 @@ impl PostgresDbConnection {
             // Array types - try to get as string representation
             // PostgreSQL uses underscore prefix for arrays (e.g., _int4 for int4[])
             _ if col_type.name().starts_with("_") || col_type.name().ends_with("[]") => {
+                info!(
+                    "[PostgreSQL] ARRAY type: {}, kind: {:?}",
+                    col_type.name(),
+                    col_type.kind()
+                );
                 // For arrays, try to get as Vec<String>
                 row.try_get::<_, Option<Vec<String>>>(index)
                     .ok()
@@ -147,12 +153,38 @@ impl PostgresDbConnection {
                     .or_else(|| Some(format!("<array: {}>", col_type.name())))
             }
 
-            // Default: try as string, otherwise show type info
-            _ => row
-                .try_get::<_, Option<String>>(index)
-                .ok()
-                .flatten()
-                .or_else(|| Some(format!("<{}>", col_type.name()))),
+            // ENUM types - ENUM values are stored as strings internally in PostgreSQL
+            _ if matches!(col_type.kind(), Kind::Enum(_)) => {
+                info!(
+                    "[PostgreSQL] ENUM type detected: {}, kind: {:?}",
+                    col_type.name(),
+                    col_type.kind()
+                );
+                // For ENUM types, try as non-Option String first (ENUM values are strings)
+                match row.try_get::<_, String>(index) {
+                    Ok(s) => Some(s),
+                    Err(_) => {
+                        // Fallback: try as Option<String>
+                        row.try_get::<_, Option<String>>(index)
+                            .ok()
+                            .flatten()
+                            .or_else(|| Some(format!("<{}>", col_type.name())))
+                    }
+                }
+            }
+
+            // Default: try as string first (handles other types)
+            _ => {
+                info!(
+                    "[PostgreSQL] DEFAULT type: {}, kind: {:?}, trying as string",
+                    col_type.name(),
+                    col_type.kind()
+                );
+                row.try_get::<_, Option<String>>(index)
+                    .ok()
+                    .flatten()
+                    .or_else(|| Some(format!("<{}>", col_type.name())))
+            }
         }
     }
 

@@ -1646,6 +1646,7 @@ impl DbTreeView {
                         | DbNodeType::QueriesFolder
                         | DbNodeType::ForeignKeysFolder
                         | DbNodeType::ChecksFolder
+                        | DbNodeType::TypesFolder
                 );
             }
         }
@@ -1804,6 +1805,9 @@ impl DbTreeView {
             Some(DbNodeType::SequencesFolder) => Icon::from(IconName::FolderSequences)
                 .color()
                 .with_size(ComponentSize::Size(px(20.))),
+            Some(DbNodeType::TypesFolder) => Icon::from(IconName::File)
+                .color()
+                .with_size(ComponentSize::Size(px(20.))),
 
             Some(DbNodeType::Table) => Icon::from(IconName::Table)
                 .color()
@@ -1849,6 +1853,9 @@ impl DbTreeView {
                 .color()
                 .with_size(ComponentSize::Size(px(20.))),
             Some(DbNodeType::NamedQuery) => Icon::from(IconName::Query)
+                .color()
+                .with_size(ComponentSize::Size(px(20.))),
+            Some(DbNodeType::Type) => Icon::from(IconName::Schema)
                 .color()
                 .with_size(ComponentSize::Size(px(20.))),
             _ => Icon::from(IconName::Loader).with_size(ComponentSize::Size(px(14.))),
@@ -1944,7 +1951,9 @@ impl DbTreeView {
                 | DbNodeType::TriggersFolder
                 | DbNodeType::QueriesFolder
                 | DbNodeType::TablesFolder
-                | DbNodeType::ViewsFolder => {
+                | DbNodeType::ViewsFolder
+                | DbNodeType::TypesFolder
+                | DbNodeType::Type => {
                     let is_expanded = self.expanded_nodes.contains(node_id);
 
                     // 切换展开状态
@@ -2376,6 +2385,7 @@ impl DbTreeView {
                         | DbNodeType::ForeignKeysFolder
                         | DbNodeType::TriggersFolder
                         | DbNodeType::ChecksFolder
+                        | DbNodeType::TypesFolder
                 ) {
                     t!(&n.name).to_string()
                 } else {
@@ -2403,6 +2413,7 @@ impl DbTreeView {
                 | Some(DbNodeType::QueriesFolder)
                 | Some(DbNodeType::ColumnsFolder)
                 | Some(DbNodeType::IndexesFolder)
+                | Some(DbNodeType::TypesFolder)
         );
 
         // 数据库筛选计数

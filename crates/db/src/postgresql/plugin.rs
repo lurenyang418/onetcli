@@ -431,6 +431,10 @@ impl DatabasePlugin for PostgresPlugin {
         true
     }
 
+    fn supports_types(&self) -> bool {
+        true
+    }
+
     fn sql_dialect(&self) -> Box<dyn sqlparser::dialect::Dialect> {
         Box::new(sqlparser::dialect::PostgreSqlDialect {})
     }
@@ -1224,6 +1228,68 @@ impl DatabasePlugin for PostgresPlugin {
             columns,
             rows,
         })
+    }
+
+    async fn list_types(
+        &self,
+        connection: &dyn DbConnection,
+        _database: &str,
+        schema: Option<String>,
+    ) -> Result<Vec<TypeInfo>> {
+        // PostgreSQL ENUM 类型查询
+        // typtype = 'e' 表示用户通过 CREATE TYPE name AS ENUM (...) 创建的枚举类型
+        let schema_condition = match schema {
+            Some(s) => format!("n.nspname = '{}'", s),
+            None => "n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast') AND n.nspname NOT LIKE 'pg_temp_%' AND n.nspname NOT LIKE 'pg_toast_temp_%'".to_string(),
+        };
+
+        let sql = format!(
+            r#"
+            SELECT
+                t.typname AS name,
+                n.nspname AS schema,
+                'ENUM' AS type_type,
+                obj_description(t.oid, 'pg_type') AS description
+            FROM pg_type t
+            JOIN pg_namespace n ON t.typnamespace = n.oid
+            WHERE ({})
+              AND t.typtype = 'e'
+            ORDER BY n.nspname, t.typname
+            "#,
+            schema_condition
+        );
+
+        let result = connection
+            .query(&sql)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to list types: {}", e))?;
+
+        if let SqlResult::Query(query_result) = result {
+            let types: Vec<TypeInfo> = query_result
+                .rows
+                .iter()
+                .filter_map(|row| {
+                    let name = row.get(0).and_then(|v| v.clone()).unwrap_or_default();
+                    let schema = row.get(1).and_then(|v| v.clone());
+                    let type_type = row.get(2).and_then(|v| v.clone()).unwrap_or_else(|| "UNKNOWN".to_string());
+                    let description = row.get(3).and_then(|v| v.clone());
+
+                    if name.is_empty() {
+                        return None;
+                    }
+
+                    Some(TypeInfo {
+                        name,
+                        schema,
+                        type_type,
+                        description,
+                    })
+                })
+                .collect();
+            Ok(types)
+        } else {
+            Err(anyhow::anyhow!("Unexpected result type"))
+        }
     }
 
     fn build_column_definition(&self, column: &ColumnInfo, include_name: bool) -> String {

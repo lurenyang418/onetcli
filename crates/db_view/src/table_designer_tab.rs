@@ -27,7 +27,7 @@ use crate::database_view_plugin::{ColumnEditorCapabilities, DatabaseViewPluginRe
 use db::GlobalDbState;
 use db::types::{
     CharsetInfo, CollationInfo, ColumnDefinition, ColumnInfo, IndexDefinition, IndexInfo,
-    ParsedColumnType, TableDesign, TableOptions,
+    ParsedColumnType, TableDesign, TableOptions, TypeInfo,
 };
 use gpui_component::select::SearchableVec;
 use one_core::storage::DatabaseType;
@@ -655,14 +655,28 @@ impl TableDesigner {
                 )
                 .await;
 
+            // 获取用户定义的类型（用于表设计器的类型下拉菜单）
+            let user_types_result = global_state
+                .list_types(
+                    cx,
+                    connection_id.clone(),
+                    database_name.clone(),
+                    schema_name.clone(),
+                )
+                .await;
+
             let _ = cx.update(|cx| {
                 if let Some(window_id) = cx.active_window() {
                     cx.update_window(window_id, |_entity, window, cx| {
                         let columns = columns_result.ok();
                         let indexes = indexes_result.ok();
+                        let user_types = user_types_result.unwrap_or_default();
 
                         if let Some(ref cols) = columns {
                             columns_editor.update(cx, |editor, cx| {
+                                // 先设置用户定义的类型
+                                editor.set_user_types(user_types.clone());
+                                // 再加载列，这样类型下拉菜单会包含用户定义的类型
                                 editor.load_columns(cols.clone(), window, cx);
                             });
                         }
@@ -1383,6 +1397,26 @@ impl ColumnsEditor {
             filtered_indices: vec![],
             _search_subscription: search_sub,
             _subscriptions: vec![],
+        }
+    }
+
+    /// Set user-defined types and update data_types list
+    /// This should be called before load_columns to include user-defined types in the dropdown
+    pub fn set_user_types(&mut self, types: Vec<TypeInfo>) {
+        // Extract type names - add both schema.name and just name for matching
+        for t in types {
+            // Add type name without schema (for direct matching with parse_column_type result)
+            let type_name = t.name.clone();
+            if !self.data_types.iter().any(|dt| dt == &type_name) {
+                self.data_types.push(type_name);
+            }
+            // Add type name with schema prefix if schema exists
+            if let Some(ref schema) = t.schema {
+                let schema_type_name = format!("{}.{}", schema, t.name);
+                if !self.data_types.iter().any(|dt| dt == &schema_type_name) {
+                    self.data_types.push(schema_type_name);
+                }
+            }
         }
     }
 

@@ -8,6 +8,7 @@ use crate::plugin::DatabasePlugin;
 use crate::postgresql::PostgresPlugin;
 use crate::{
     DbNode, DbNodeType, ExecOptions, SqlErrorInfo, SqlResult, SqlSource, TableSaveResponse,
+    TypeInfo,
 };
 use dashmap::DashMap;
 use gpui::{AppContext, AsyncApp, Global};
@@ -1715,6 +1716,19 @@ impl GlobalDbState {
         }
 
         Ok(indexes)
+    }
+
+    /// List user-defined types (for PostgreSQL: ENUM, DOMAIN, COMPOSITE, etc.)
+    pub async fn list_types(
+        &self,
+        cx: &mut AsyncApp,
+        connection_id: String,
+        database: String,
+        schema: Option<String>,
+    ) -> anyhow::Result<Vec<TypeInfo>> {
+        with_plugin_session_db!(self, cx, connection_id, database.clone(), |plugin, conn| {
+            plugin.list_types(&*conn, &database, schema).await
+        })
     }
 
     /// List views
